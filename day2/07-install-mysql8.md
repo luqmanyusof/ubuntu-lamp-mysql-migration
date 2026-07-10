@@ -1,10 +1,10 @@
 # 07 — Install MySQL 8 Community
 
-**Goal:** Install and run **MySQL 8 Community Server** on **ubuntu-target**, confirm it's running, and log in for the first time.
+**Goal:** Install and run **MySQL 8 Community Server** on **ubuntu-db**, confirm it's running, and log in for the first time.
 
 **Time:** ~30 minutes
 
-> All commands run on **ubuntu-target** (SSH in from Windows).
+> All commands run on **ubuntu-db** (SSH in from Windows). Check your prompt says `student@ubuntu-db`.
 > **Edition:** we use **MySQL 8 Community**. (Enterprise is a later decision and installs from a different repository; nothing in this course depends on Enterprise.)
 
 ---
@@ -100,13 +100,20 @@ You met these paths in file 06 — now you can see them for real.
 
 ---
 
-## 6. A note on binding and the network (for later)
+## 6. A note on binding and the network (we open this up in file 08)
 
-By default MySQL 8 on Ubuntu binds to `127.0.0.1` (localhost only) — it does **not** accept network connections yet. That's fine and secure for now.
+Check where MySQL is currently listening:
 
-During the **migration (file 14)** we discuss whether the data crosses the network live or via a dump file. For our approach (dump file transferred, then imported locally), MySQL can stay bound to localhost — one less thing to expose. We'll call this out explicitly when we get there.
+```bash
+$ grep -i bind-address /etc/mysql/mysql.conf.d/mysqld.cnf
+$ sudo ss -tlnp | grep 3306
+```
 
-> Do **not** change `bind-address` now. We decide that in the migration lab based on the method chosen.
+By default MySQL 8 on Ubuntu binds to `127.0.0.1` (localhost only) — it does **not** accept network connections yet. On a single-server LAMP box that's ideal. **But our app lives on a different machine** (`ubuntu-app`), so MySQL must be reachable over the network.
+
+We change `bind-address` and open the firewall **in the next file (08)**, together with creating the remote app user — so the "expose it" steps and the "secure it" steps happen as one deliberate, scoped operation.
+
+> Do **not** change `bind-address` yet. Finish this file first; file 08 does it properly alongside the firewall rule and the `'appuser'@'<app-IP>'` account.
 
 ---
 

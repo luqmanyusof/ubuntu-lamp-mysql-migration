@@ -1,39 +1,39 @@
 # 14 — Migration Execution
 
-**Mode:** Instructor demo
-**Goal:** Transfer the source dump to the target and **import it into MySQL 8**, reaching a clean stopping point with the data loaded.
+**Mode:** Instructor demo (trainees watch)
+**Goal:** Transfer the CentOS dump to the Ubuntu target and **import it into MySQL 8**, reaching a clean stopping point with the data loaded.
 
 **Time:** ~30–40 minutes narrated
 
-> We move a **file** between servers, then import **locally** on the target. Because we import locally, MySQL 8 can stay bound to localhost — minimal exposure.
+> We move a **file** between servers, then import **locally** on the Ubuntu target. Because we import locally, MySQL 8 needn't accept a live network connection from the source — minimal exposure.
 
 ---
 
-## 1. Transfer the dump from source → target
+## 1. Transfer the dump: CentOS source → Ubuntu target
 
-We use `scp` (secure copy over SSH). Run this **on the source**, sending to the target's IP:
+We use `scp` (secure copy over SSH). Run this **on the CentOS source**, sending to the Ubuntu target's IP:
 
 ```bash
-$ scp ~/sourcedb_dump.sql.gz student@<target-IP>:~/
+# scp ~/sourcedb_dump.sql.gz  student@<ubuntu-target-IP>:~/
 ```
 
 Enter the target's `student` password when prompted.
 
-> **About the firewall & port 3306:** Our method copies a *file* over SSH (port 22, already open) and imports *locally* on the target. So we do **not** need to open 3306 at all.
+> **About the firewall & port 3306:** This method copies a *file* over SSH (port 22, already open) and imports *locally* on the target — so we do **not** need to open 3306 for MySQL at all.
 >
-> **If** instead you demonstrate a *direct network import* (`mysql -h <target-IP>` from the source), then — and only then — open 3306 narrowly on the **target**:
+> **If** instead you demonstrate a *direct network import* (`mysql -h <ubuntu-target-IP>` from the CentOS source), then — and only then — open 3306 narrowly **on the Ubuntu target**:
 > ```bash
-> $ sudo ufw allow from <source-IP> to any port 3306
+> $ sudo ufw allow from <centos-source-IP> to any port 3306
 > ```
-> Note the `from <source-IP>` — never open 3306 to `Anywhere`. This is the Day 2 PM step of the firewall thread. For the file-transfer method we teach here, you can skip it.
+> Never open 3306 to `Anywhere`. (On the CentOS side the equivalent rule is `firewall-cmd`, not UFW — see the trainer runbook.) For the file-transfer method shown here, you can skip it.
 
-📌 **Checkpoint:** `sourcedb_dump.sql.gz` now exists in the target's home directory (`ls ~` on target).
+📌 **Checkpoint:** `sourcedb_dump.sql.gz` now exists in the Ubuntu target's home directory (`ls ~` on the target).
 
 ---
 
 ## 2. On the target, decompress the dump
 
-SSH into **ubuntu-target**:
+SSH into the **Ubuntu target** (`ubuntu-db-new`):
 
 ```bash
 $ gunzip ~/sourcedb_dump.sql.gz
@@ -96,27 +96,31 @@ mysql> FLUSH PRIVILEGES;
 
 ---
 
-## 6. Snapshot the loaded state
+## 6. Snapshot the loaded state (trainer's demo hosts)
 
-Take a snapshot on **both** VMs now:
+Take a snapshot on **both** demo hosts now:
 
 - Name: **`day2-migration-loaded`**
-- Description: `Source dump imported into MySQL 8; pre-validation`
+- Description: `CentOS dump imported into Ubuntu MySQL 8; pre-validation`
 
-This is the restore point we start Day 3 from.
+This is the restore point the demo starts Day 3 from. (Trainees already snapshotted their own `ubuntu-app`/`ubuntu-db` as `day2-two-tier` in file 11 — those are untouched by this demo.)
 
-📌 **Checkpoint:** Snapshot `day2-migration-loaded` exists on both VMs.
+📌 **Checkpoint:** Snapshot `day2-migration-loaded` exists on both demo hosts.
 
 ---
 
 ## Day 2 wrap-up
 
-- [ ] LAMP stack complete and app working (AM)
-- [ ] Source dumped consistently, known-good copy kept
-- [ ] Dump transferred and imported into MySQL 8
+**Participant stack (AM, hands-on):**
+- [ ] Two-tier LAMP working: app on `ubuntu-app`, MySQL 8 on `ubuntu-db`
+- [ ] App reaches the database across the network; `day2-two-tier` snapshot taken
+
+**Migration demo (PM, watched):**
+- [ ] CentOS source dumped consistently, known-good copy kept
+- [ ] Dump transferred and imported into the Ubuntu MySQL 8 target
 - [ ] Data present in MySQL 8 (counts match source)
-- [ ] Both VMs snapshotted at `day2-migration-loaded`
+- [ ] Demo hosts snapshotted at `day2-migration-loaded`
 
-> **Trainer note (Luqman):** End here even if some warnings appeared. The data is across — that's the Day 2 PM goal. Tomorrow morning we resolve the 5→8 differences and validate properly. Resist the urge to fix everything now; the split protects your timing.
+> **Trainer note (Luqman):** End the demo here even if some warnings appeared. The data is across — that's the Day 2 PM goal. Tomorrow morning you resolve the 5→8 differences and validate properly. Resist fixing everything now; the split protects your timing. Keep the runbook (`trainer-only/…`) open for the CentOS-side commands.
 
-Next: **Day 3** — finish the migration (files 15–17), then deepen LAMP & security (18–20).
+Next: **Day 3** — finish the migration demo (files 15–17), then trainees deepen MySQL admin & harden their two-tier stack (18–20).

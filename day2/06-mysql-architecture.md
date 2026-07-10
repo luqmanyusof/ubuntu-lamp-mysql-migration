@@ -87,27 +87,28 @@ You'll revisit these in file 07 (install) and file 18 (deeper admin).
 Two ways in:
 
 1. **Local socket** — a same-machine connection via the `.sock` file. Fast, used when you run `mysql` on the server itself.
-2. **TCP port 3306** — a network connection. Used by remote clients and, critically, by our **migration** when data crosses from source to target.
+2. **TCP port 3306** — a network connection. Used by remote clients — and, critically for us, by the **PHP app on `ubuntu-app`**, which lives on a *different machine* and must reach MySQL across the network.
 
-> This is why the firewall thread later opens **3306 from the source IP only** — the migration needs a network path, but we keep it tightly scoped.
+> This is why the firewall thread opens **3306 from the app server's IP only** — the app genuinely needs a network path to the database, but we keep that path scoped to exactly one source.
 
 ---
 
 ## 6. Users and privileges (preview)
 
-A MySQL user is written as **`'username'@'host'`** — the *host* part matters:
+A MySQL user is written as **`'username'@'host'`** — the *host* part matters, and in a two-tier setup it matters a lot:
 
-- `'app'@'localhost'` — can connect only from the same machine.
-- `'app'@'192.168.1.50'` — can connect only from that IP.
+- `'app'@'localhost'` — can connect only from the DB machine itself. **Not** what we want: our app is on another machine.
+- `'app'@'192.168.1.50'` — can connect only from that IP. **This is what we use** — the IP of `ubuntu-app`.
+- `'app'@'192.168.1.%'` — can connect from that whole subnet (looser; handy if the app IP changes via DHCP).
 - `'app'@'%'` — can connect from anywhere (avoid unless necessary).
 
-Privileges (SELECT, INSERT, CREATE, …) are granted **per user, per database**. We set these up in file 08.
+Because our app runs on `ubuntu-app`, we create the user as `'appuser'@'<app-IP>'`, not `@'localhost'`. Privileges (SELECT, INSERT, CREATE, …) are granted **per user, per database**. We set these up in file 08.
 
 ---
 
 ## 7. MySQL 5.x vs 8 — the headline (full detail on Day 3)
 
-You're migrating from **5.x** to **8**. Big-picture changes to keep in mind:
+The trainer will demo a **5.x → 8** migration this afternoon. You don't perform it, but understanding the big-picture changes helps you follow along — and they're good MySQL 8 knowledge regardless:
 
 - **Default authentication plugin** changed to `caching_sha2_password` in 8 (was `mysql_native_password` in 5.x). This is the single most common thing that breaks app/tool connections after migration.
 - **Character set** default is now `utf8mb4` (true 4-byte UTF-8).
@@ -125,6 +126,6 @@ You can answer, in your own words:
 - [ ] What is the difference between a *database* and a *table*?
 - [ ] What is InnoDB and why do we prefer it over MyISAM?
 - [ ] What are the two ways a client connects to MySQL?
-- [ ] Why will we open port 3306 only from the source IP?
+- [ ] Why do we create the app user as `'appuser'@'<app-IP>'` and open 3306 only from the app server?
 
 If yes, continue to **`07-install-mysql8.md`**.

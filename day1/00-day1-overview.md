@@ -1,14 +1,16 @@
 # Day 1 — Ubuntu Foundations
 
 **Mode:** Hands-on labs
-**Goal:** By the end of today you will have **two secured Ubuntu Server VMs** (a *source* and a *target*) running in VirtualBox, both reachable over SSH from your Windows host.
+**Goal:** By the end of today you will have **two secured Ubuntu Server VMs** (an *app server* and a *database server*) running in VirtualBox, both reachable over SSH from your Windows host.
 
-These two VMs are the foundation for the rest of the course:
+These two VMs are the foundation for the rest of the course — a small but realistic **two-tier** setup where the application and the database live on **separate machines**:
 
-- **source** — will later hold **MySQL 5.x** (the old database we migrate *from*).
-- **target** — will later hold the full **LAMP stack + MySQL 8** (what we migrate *to*).
+- **ubuntu-app** — will later run **Apache + PHP** (the web/application tier).
+- **ubuntu-db** — will later run **MySQL 8** (the database tier).
 
-Today we do not install any database yet. Today is purely about getting Ubuntu installed, understood, and locked down.
+Tomorrow the app on `ubuntu-app` connects to MySQL on `ubuntu-db` **over the network** — which is exactly why we get comfortable SSH-ing into both today.
+
+Today we do not install any software yet. Today is purely about getting Ubuntu installed, understood, and locked down on both.
 
 ---
 
@@ -18,10 +20,11 @@ Today we do not install any database yet. Today is purely about getting Ubuntu i
 Windows Host (your laptop)
 │
 ├── VirtualBox
-│   ├── VM: ubuntu-source   (Ubuntu Server, SSH on port 22)
-│   └── VM: ubuntu-target   (Ubuntu Server, SSH on port 22)
+│   ├── VM: ubuntu-app   (Ubuntu Server — later Apache + PHP)   SSH on port 22
+│   └── VM: ubuntu-db    (Ubuntu Server — later MySQL 8)        SSH on port 22
 │
 └── You connect to both VMs via SSH from a Windows terminal
+    (and tomorrow, ubuntu-app talks to ubuntu-db over the network)
 ```
 
 ---
@@ -31,7 +34,7 @@ Windows Host (your laptop)
 | # | File | What you achieve |
 |---|------|------------------|
 | 00 | `00-day1-overview.md` | This page — the map for the day |
-| 01 | `01-virtualbox-setup.md` | Install VirtualBox and create two empty VMs |
+| 01 | `01-virtualbox-setup.md` | Install VirtualBox and create the two empty VMs (`ubuntu-app`, `ubuntu-db`) |
 | 02 | `02-download-ubuntu-iso.md` | Download and verify the Ubuntu Server ISO |
 | 03 | `03-ubuntu-installation.md` | Install Ubuntu Server on **both** VMs |
 | 04 | `04-linux-admin-essentials.md` | Learn the everyday Linux admin commands |
@@ -47,7 +50,7 @@ Windows Host (your laptop)
 - 📌 **Checkpoint** boxes tell you how to confirm a step worked before moving on.
 - ⚠️ **Watch out** boxes flag the common mistakes.
 
-> **Trainer note (Luqman):** We do every step twice — once on `ubuntu-source`, once on `ubuntu-target`. Do the first VM together as a group, then let each trainee do the second VM on their own to build muscle memory.
+> **Trainer note (Luqman):** We do every step twice — once on `ubuntu-app`, once on `ubuntu-db`. Do the first VM together as a group, then let each trainee do the second VM on their own to build muscle memory.
 
 ---
 
@@ -59,7 +62,7 @@ Firewall is taught across all three days, not in one block. Today (Day 1) you le
 - How to enable it **without locking yourself out**
 - How to **allow SSH (port 22)** so you keep remote access
 
-Later days add Apache (80/443) and MySQL (3306). Keep this progression in mind.
+Later days add web ports on `ubuntu-app` (80/443) and MySQL on `ubuntu-db` (3306, opened **only** to the app server). Keep this progression in mind.
 
 ---
 
@@ -75,4 +78,4 @@ You are done with Day 1 when **all** of these are true for **both** VMs:
 - [ ] System is fully updated (`sudo apt update && sudo apt upgrade`)
 - [ ] You have taken a **VirtualBox snapshot** named `day1-clean` on each VM
 
-The snapshot at the end is important — it's our safe restore point before we start installing software on Day 2.
+The snapshot at the end is important — it's our safe restore point before we start installing software on Day 2 (Apache + PHP on `ubuntu-app`, MySQL 8 on `ubuntu-db`).

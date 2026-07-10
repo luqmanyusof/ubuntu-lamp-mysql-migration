@@ -71,7 +71,7 @@ The hash from PowerShell must **exactly match** the one from Ubuntu's SHA256SUMS
 
 Now we plug the installer "CD" into each virtual machine.
 
-For **each** VM (`ubuntu-source` and `ubuntu-target`):
+For **each** VM (`ubuntu-app` and `ubuntu-db`):
 
 1. Select the VM → **Settings → Storage**.
 2. Under the **Controller: IDE** (or SATA), click the **Empty** optical drive (the CD icon).

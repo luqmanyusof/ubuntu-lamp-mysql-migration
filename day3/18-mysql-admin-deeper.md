@@ -1,22 +1,22 @@
 # 18 — MySQL Administration (Deeper)
 
 **Mode:** Hands-on / discussion
-**Goal:** Practise the day-to-day administration you'll need to run the migrated MySQL 8 server: backups, logs, configuration, users, and basic performance.
+**Goal:** Practise the day-to-day administration you'll need to run your MySQL 8 database server: backups, logs, configuration, users, and basic performance.
 
 **Time:** ~50 minutes
 
-> All hands-on on **ubuntu-target**.
+> All hands-on on **ubuntu-db** (your database tier). Check your prompt says `student@ubuntu-db`.
 
 ---
 
 ## 1. Backups you can rely on
 
-You already used `mysqldump` for migration. As a **routine backup** habit:
+You saw `mysqldump` in the migration demo. As a **routine backup** habit on your own `appdb`:
 
 ```bash
 # Full logical backup of one database, dated
 $ sudo mysqldump --single-transaction --routines --triggers \
-    sourcedb > ~/backup_sourcedb_$(date +%F).sql
+    appdb > ~/backup_appdb_$(date +%F).sql
 
 # All databases (server-wide)
 $ sudo mysqldump --single-transaction --all-databases > ~/backup_all_$(date +%F).sql
@@ -25,7 +25,7 @@ $ sudo mysqldump --single-transaction --all-databases > ~/backup_all_$(date +%F)
 **Restore** (to a named DB):
 
 ```bash
-$ sudo mysql sourcedb < ~/backup_sourcedb_2026-07-10.sql
+$ sudo mysql appdb < ~/backup_appdb_2026-07-10.sql
 ```
 
 Discussion points:
@@ -71,7 +71,7 @@ Settings worth knowing (don't change blindly):
 
 | Setting | Meaning |
 |---------|---------|
-| `bind-address` | Which IPs MySQL listens on (`127.0.0.1` = localhost only) |
+| `bind-address` | Which IPs MySQL listens on. Yours is `0.0.0.0` (network) so `ubuntu-app` can reach it — access is restricted by the firewall + user host, not this line (file 08) |
 | `max_connections` | Max simultaneous client connections |
 | `innodb_buffer_pool_size` | RAM InnoDB uses to cache data — biggest performance lever |
 | `datadir` | Where data files live |
@@ -91,12 +91,12 @@ $ sudo tail -n 20 /var/log/mysql/error.log
 ## 4. Managing users and privileges
 
 ```sql
-mysql> SELECT user, host, plugin FROM mysql.user;      -- who exists
-mysql> SHOW GRANTS FOR 'sourceapp'@'localhost';        -- what can they do
-mysql> CREATE USER 'reporter'@'localhost' IDENTIFIED BY 'Str0ng!';
-mysql> GRANT SELECT ON sourcedb.* TO 'reporter'@'localhost';   -- read-only user
-mysql> REVOKE INSERT ON sourcedb.* FROM 'someuser'@'localhost';
-mysql> DROP USER 'olduser'@'localhost';
+mysql> SELECT user, host, plugin FROM mysql.user;      -- who exists (note appuser's host = app-IP)
+mysql> SHOW GRANTS FOR 'appuser'@'<app-IP>';           -- what can the app user do
+mysql> CREATE USER 'reporter'@'<app-IP>' IDENTIFIED BY 'Str0ng!';
+mysql> GRANT SELECT ON appdb.* TO 'reporter'@'<app-IP>';   -- read-only user, scoped to the app server
+mysql> REVOKE INSERT ON appdb.* FROM 'someuser'@'<app-IP>';
+mysql> DROP USER 'olduser'@'<app-IP>';
 mysql> FLUSH PRIVILEGES;
 ```
 
@@ -124,15 +124,18 @@ The **`sys`** schema (built into MySQL 8) provides friendly views over performan
 
 The single biggest everyday performance tool is the **index** — and `EXPLAIN` shows whether a query uses one:
 
+Try it on your own `appdb.messages` table:
+
 ```sql
-mysql> EXPLAIN SELECT * FROM orders WHERE customer_id = 42;
+mysql> USE appdb;
+mysql> EXPLAIN SELECT * FROM messages WHERE author = 'Trainer';
 ```
 
 - `type: ALL` and no `key` → a **full table scan** (slow on big tables).
 - Add an index and re-check:
   ```sql
-  mysql> CREATE INDEX idx_orders_customer ON orders(customer_id);
-  mysql> EXPLAIN SELECT * FROM orders WHERE customer_id = 42;   -- should now use the index
+  mysql> CREATE INDEX idx_messages_author ON messages(author);
+  mysql> EXPLAIN SELECT * FROM messages WHERE author = 'Trainer';   -- should now use the index
   ```
 
 📌 **Checkpoint:** You use `EXPLAIN` to show a full scan, add an index, and show the query now using it.
