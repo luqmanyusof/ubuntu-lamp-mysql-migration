@@ -4,20 +4,22 @@
 
 **Time:** ~60 minutes
 
-> Do this lab on **`ubuntu-source`** (log in at its console, or SSH in once you've done lab 05). Every command here is safe to run and repeat.
+> Do this lab on **`ubuntu-app`** (log in at its console, or SSH in once you've done lab 05). Every command here is safe to run and repeat. The commands are identical on `ubuntu-db` — practise on both if time allows.
 
 ---
 
 ## 1. Understanding the prompt
 
 ```
-student@ubuntu-source:~$
-│       │             │ │
-│       │             │ └─ $ = normal user   (# would mean root)
-│       │             └─── ~ = your home directory (/home/student)
-│       └───────────────── the machine's hostname
-└───────────────────────── your username
+student@ubuntu-app:~$
+│       │          │ │
+│       │          │ └─ $ = normal user   (# would mean root)
+│       │          └─── ~ = your home directory (/home/student)
+│       └────────────── the machine's hostname
+└────────────────────── your username
 ```
+
+> The hostname in the prompt is how you always know **which VM you're on** — `ubuntu-app` or `ubuntu-db`. Glance at it before every command that matters.
 
 ---
 
@@ -147,7 +149,7 @@ $ sudo usermod -aG sudo bob   # give bob admin rights (add to sudo group)
 $ sudo deluser bob       # remove a user
 ```
 
-> **Why it matters for migration:** MySQL and Apache run as their own dedicated Linux users (`mysql`, `www-data`). Understanding users now makes those services make sense later.
+> **Why it matters here:** Apache runs as its own Linux user `www-data` (on `ubuntu-app`) and MySQL runs as `mysql` (on `ubuntu-db`). Understanding users now makes those services make sense when we install them tomorrow.
 
 ---
 

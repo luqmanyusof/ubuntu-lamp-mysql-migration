@@ -1,11 +1,11 @@
 # 13 — Backup & Dump the Source
 
-**Mode:** Instructor demo
+**Mode:** Instructor demo (trainees watch)
 **Goal:** Produce a **consistent, complete `mysqldump`** of the source MySQL 5.x database, ready to load into MySQL 8.
 
 **Time:** ~30 minutes narrated
 
-> Commands run on **ubuntu-source** unless noted. Substitute your real database name for `sourcedb` and your admin user for `root`.
+> Commands run on the **CentOS source** (`centos-db`) unless noted. Substitute your real database name for `sourcedb` and your admin user for `root`. On CentOS the MySQL service is usually `mysqld` and `root` uses a **password** (not socket auth). Full CentOS-specifics are in `trainer-only/centos-mysql5-to-ubuntu-mysql8-migration.md`.
 
 ---
 

@@ -1,38 +1,38 @@
-# 19 — Security Hardening (Consolidated)
+# 19 — Security Hardening (Two-Tier, Consolidated)
 
 **Mode:** Hands-on / discussion
-**Goal:** Pull together everything into one deliberate hardening pass across the whole stack — OS, SSH, firewall, MySQL, and web — and review the firewall thread as a whole.
+**Goal:** Pull everything into one deliberate hardening pass across the **whole two-tier stack** — OS, SSH, firewall, MySQL, and web — and review the firewall thread as a whole.
 
 **Time:** ~50 minutes
 
-> Apply on **ubuntu-target** (and mirror the OS/SSH/firewall parts on `ubuntu-source`).
+> This lab spans **both** VMs. Apply the OS/SSH/firewall parts on **both** `ubuntu-app` and `ubuntu-db`; the MySQL parts on `ubuntu-db`; the web/PHP parts on `ubuntu-app`. Watch your prompt.
 
 ---
 
-## 1. Operating system
+## 1. Operating system (both VMs)
 
-Keep the system patched:
+Keep each system patched:
 
 ```bash
 $ sudo apt update && sudo apt upgrade -y
 ```
 
-Enable **automatic security updates**:
+Enable **automatic security updates** on both:
 
 ```bash
 $ sudo apt install unattended-upgrades -y
 $ sudo dpkg-reconfigure --priority=low unattended-upgrades   # choose Yes
 ```
 
-Discussion: minimal install = smaller attack surface. Don't install packages you don't need.
+Discussion: minimal install = smaller attack surface. `ubuntu-db` in particular should run **only** MySQL — no web server, no extra packages.
 
-📌 **Checkpoint:** System fully patched; unattended-upgrades enabled.
+📌 **Checkpoint:** Both VMs patched; unattended-upgrades enabled on each.
 
 ---
 
-## 2. SSH hardening
+## 2. SSH hardening (both VMs)
 
-Edit the SSH server config:
+Edit the SSH server config on each:
 
 ```bash
 $ sudo nano /etc/ssh/sshd_config
@@ -46,79 +46,91 @@ PasswordAuthentication no        # only after you've set up SSH keys! (Day 1 lab
 MaxAuthTries 3
 ```
 
-> ⚠️ **Do not set `PasswordAuthentication no` until key-based login works**, or you'll lock yourself out. Test keys first.
+> ⚠️ **Do not set `PasswordAuthentication no` until key-based login works** on that VM, or you'll lock yourself out. Test keys first, keep a second session open.
 
-Apply and verify (keep a second session open as a safety net):
+Apply and verify:
 
 ```bash
 $ sudo systemctl restart ssh
 $ sudo systemctl status ssh
 ```
 
-📌 **Checkpoint:** Root SSH disabled; (if keys are set up) password auth disabled; you can still log in with your key.
+📌 **Checkpoint:** On both VMs: root SSH disabled; (if keys set up) password auth disabled; you can still log in with your key.
 
 ---
 
-## 3. Firewall — the consolidated review
+## 3. Firewall — the consolidated two-tier review
 
-This is where the **firewall thread** comes together. Review the full posture:
+This is where the **firewall thread** comes together. Each machine exposes only what its role needs. Review both:
 
 ```bash
-$ sudo ufw status verbose
+$ sudo ufw status verbose     # run on each VM
 ```
 
-The intended rule set across the course:
+The intended posture across the course:
 
-| Port | Service | Rule | Added |
-|------|---------|------|-------|
-| 22 | SSH | `ALLOW` (optionally from admin IPs only) | Day 1 |
-| 80/443 | Apache | `ALLOW` (Apache Full) | Day 2 AM |
-| 3306 | MySQL | `ALLOW from <source-IP>` **only** (if opened at all) | Day 2 PM |
+| VM | Port | Service | Rule |
+|----|------|---------|------|
+| both | 22 | SSH | `ALLOW` (optionally from admin IPs only) |
+| `ubuntu-app` | 80/443 | Apache | `ALLOW` (Apache Full) |
+| `ubuntu-db` | 3306 | MySQL | `ALLOW from <app-IP>` **only** |
 
 **Principle of least exposure — act on it now:**
 
-- The migration is done. If you opened **3306**, **close it again** — nothing external needs it anymore:
+- On **`ubuntu-db`**, confirm 3306 is open to the **app server only**, never `Anywhere`:
   ```bash
-  $ sudo ufw status numbered
-  $ sudo ufw delete <number-of-the-3306-rule>
+  $ sudo ufw status               # the 3306 line must show From = <app-IP>
   ```
-- Consider restricting **SSH** to known admin IPs instead of Anywhere:
+  > Unlike a one-off migration port, this rule is **permanent** — the app depends on it. The hardening goal here is not to close 3306 but to keep it **tightly scoped** to exactly `ubuntu-app`. If you see `3306 ALLOW Anywhere`, fix it:
+  > ```bash
+  > $ sudo ufw status numbered
+  > $ sudo ufw delete <number-of-the-wide-3306-rule>
+  > $ sudo ufw allow from <app-IP> to any port 3306 proto tcp
+  > ```
+- Consider restricting **SSH** to known admin IPs on both VMs:
   ```bash
   $ sudo ufw delete allow OpenSSH
   $ sudo ufw allow from <your-admin-IP> to any port 22 proto tcp
   ```
-- Confirm defaults: `deny incoming`, `allow outgoing`:
+- Confirm defaults on both: `deny incoming`, `allow outgoing`:
   ```bash
   $ sudo ufw default deny incoming
   $ sudo ufw default allow outgoing
   ```
 
-📌 **Checkpoint:** Only the ports you actually need are open; 3306 is closed again post-migration; defaults deny inbound.
+📌 **Checkpoint:** `ubuntu-app` exposes only 22 + 80/443; `ubuntu-db` exposes only 22 + 3306-from-app-IP; both default-deny inbound.
 
 ---
 
-## 4. MySQL hardening (recap + additions)
+## 4. MySQL hardening (on `ubuntu-db`)
 
 Re-confirm the Day 2 basics and add a few:
 
 - ✅ `mysql_secure_installation` was run (anon users removed, test DB gone, remote root off).
-- ✅ Apps use **least-privilege** users, never root.
-- **Keep MySQL bound to localhost** unless a remote client genuinely needs it:
+- ✅ The app uses a **least-privilege** user (`appuser`), never root.
+- **On network binding — the two-tier reality:** MySQL here is *intentionally* bound to the network (`0.0.0.0`) so the app can reach it. That is fine **because** two other layers restrict access — the firewall (3306 from `<app-IP>` only) and the user host (`'appuser'@'<app-IP>'`). Confirm both are still true:
   ```bash
-  $ grep bind-address /etc/mysql/mysql.conf.d/mysqld.cnf   # expect 127.0.0.1
+  $ grep bind-address /etc/mysql/mysql.conf.d/mysqld.cnf   # 0.0.0.0 (network) — protected by firewall + user host
+  $ sudo ufw status | grep 3306                            # ALLOW from <app-IP> only
   ```
-- Audit accounts and privileges:
+- Audit accounts and privileges — flag anything wide-open:
   ```sql
   mysql> SELECT user, host FROM mysql.user;                 -- any unexpected accounts/hosts?
-  mysql> SELECT user, host FROM mysql.user WHERE host='%';  -- flag wide-open hosts
+  mysql> SELECT user, host FROM mysql.user WHERE host='%';  -- flag any wildcard-host accounts
   ```
-- Remove any leftover migration/test users no longer needed (`DROP USER ...`).
+- Confirm the app user is scoped to the app IP, **not** `%`:
+  ```sql
+  mysql> SELECT user, host FROM mysql.user WHERE user='appuser';   -- host should be <app-IP> (or your subnet)
+  ```
+- Drop any leftover test/reporting users no longer needed (`DROP USER ...`).
 
-📌 **Checkpoint:** MySQL bound to localhost; no unexpected or wildcard-host accounts; least privilege confirmed.
+📌 **Checkpoint:** MySQL reachable only from the app server (firewall + user host); no unexpected or wildcard-host accounts; least privilege confirmed.
+
+> **Discussion — going further:** for production you'd add **TLS** on the app↔DB connection (`REQUIRE SSL` on the user, certs on the server) so the traffic between the two servers is encrypted, not just access-controlled. We note it; the classroom uses a trusted LAN.
 
 ---
 
-## 5. Web / PHP hardening
+## 5. Web / PHP hardening (on `ubuntu-app`)
 
 - **Remove info leaks:** ensure `info.php` / any `phpinfo()` files are gone:
   ```bash
@@ -135,9 +147,9 @@ Re-confirm the Day 2 basics and add a few:
   ```bash
   $ sudo systemctl reload apache2
   ```
-- **Credentials outside web root** — confirm `appconfig.php` is not under `/var/www/html` and is `640` (we did this in file 11).
+- **Credentials outside web root** — confirm `appconfig.php` is not under `/var/www/html` and is `640` (file 11).
 - **App code** uses prepared statements + `htmlspecialchars` (SQL injection / XSS defenses, file 11).
-- **HTTPS** — discussion: for production, add TLS (e.g. Let's Encrypt / `certbot`). We note it; the classroom uses HTTP.
+- **HTTPS** — discussion: for production, add TLS to the web tier (e.g. Let's Encrypt / `certbot`). We note it; the classroom uses HTTP.
 
 📌 **Checkpoint:** No phpinfo files; server banners minimized; app credentials protected.
 
@@ -148,17 +160,18 @@ Re-confirm the Day 2 basics and add a few:
 Take the course's final snapshot on **both** VMs:
 
 - Name: **`day3-complete`**
-- Description: `Migration finished, validated, and hardened`
+- Description: `Two-tier LAMP: migrated-DB knowledge, hardened, firewall scoped`
 
 ---
 
 ## Hardening scorecard
 
-- [ ] OS patched + auto-updates on
-- [ ] Root SSH off; key auth (and password auth off) working
-- [ ] Firewall reviewed; least exposure; 3306 closed post-migration
-- [ ] MySQL localhost-bound; least-privilege accounts; no wildcard hosts
+- [ ] Both VMs patched + auto-updates on
+- [ ] Root SSH off on both; key auth (and password auth off) working
+- [ ] `ubuntu-app`: only 22 + 80/443 open
+- [ ] `ubuntu-db`: only 22 + 3306-from-app-IP open (never `Anywhere`)
+- [ ] MySQL access restricted by firewall **and** user host; no wildcard accounts
 - [ ] Web: no info leaks; banners minimized; secure app patterns
-- [ ] `day3-complete` snapshot taken
+- [ ] `day3-complete` snapshot taken on both VMs
 
 Next: **`20-troubleshooting-workshop.md`** — practise fixing things that break.

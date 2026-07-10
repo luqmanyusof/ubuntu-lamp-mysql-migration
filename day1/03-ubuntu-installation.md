@@ -4,13 +4,13 @@
 
 **Time:** ~30 minutes per VM (much of it unattended)
 
-> Do the whole lab on **`ubuntu-source`** first. Then repeat every step on **`ubuntu-target`**, changing only the hostname (see section 9).
+> Do the whole lab on **`ubuntu-app`** first. Then repeat every step on **`ubuntu-db`**, changing only the hostname (see section 9).
 
 ---
 
 ## 1. Start the installer
 
-1. In VirtualBox Manager, select **`ubuntu-source`**.
+1. In VirtualBox Manager, select **`ubuntu-app`**.
 2. Click **Start** (green arrow).
 3. A console window opens and boots from the ISO.
 4. At the GRUB menu, choose **Try or Install Ubuntu Server** (or just wait — it auto-selects).
@@ -80,7 +80,7 @@ Fill in carefully — you will type these often:
 | Field | Value for this course |
 |-------|-----------------------|
 | Your name | `Trainee` (anything) |
-| Your server's name (hostname) | `ubuntu-source` |
+| Your server's name (hostname) | `ubuntu-app` |
 | Pick a username | `student` |
 | Choose a password | something you'll remember |
 | Confirm password | same |
@@ -118,7 +118,7 @@ This single checkbox is what makes the VM reachable over SSH. Do not skip it.
 📌 **Checkpoint:** The VM reboots and lands on a text **login prompt**:
 
 ```
-ubuntu-source login:
+ubuntu-app login:
 ```
 
 ---
@@ -128,14 +128,14 @@ ubuntu-source login:
 At the prompt:
 
 ```
-ubuntu-source login: student
+ubuntu-app login: student
 Password: (type your password — nothing shows as you type, that's normal)
 ```
 
 You should land at a shell prompt:
 
 ```
-student@ubuntu-source:~$
+student@ubuntu-app:~$
 ```
 
 Run a first command to confirm it's alive and note the IP again:
@@ -148,17 +148,17 @@ $ ip a
 
 ---
 
-## 12. Now do it all again for `ubuntu-target`
+## 12. Now do it all again for `ubuntu-db`
 
-Repeat sections 1–11 on the **`ubuntu-target`** VM, with **one change**:
+Repeat sections 1–11 on the **`ubuntu-db`** VM, with **one change**:
 
-- On the profile screen (section 7), set the **hostname to `ubuntu-target`**.
+- On the profile screen (section 7), set the **hostname to `ubuntu-db`**.
 
 Everything else is identical. Use the same username `student` on both — it keeps later commands consistent.
 
-📌 **Checkpoint:** You now have two VMs, both at a login prompt:
-- `ubuntu-source` — IP: __________ (write it here)
-- `ubuntu-target` — IP: __________ (write it here)
+📌 **Checkpoint:** You now have two VMs, both at a login prompt. **Write down both IPs — you'll wire them together tomorrow:**
+- `ubuntu-app` — IP: __________
+- `ubuntu-db` — IP: __________
 
 ---
 

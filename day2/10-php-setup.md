@@ -1,10 +1,10 @@
 # 10 — PHP Setup
 
-**Goal:** Install **PHP** on ubuntu-target, wire it into Apache, and confirm PHP can talk to MySQL. This completes the **P** and links all of LAMP together.
+**Goal:** Install **PHP** on ubuntu-app, wire it into Apache, and install the MySQL driver so PHP can talk to the database on `ubuntu-db`. This completes the **P**.
 
 **Time:** ~25 minutes
 
-> All commands on **ubuntu-target**.
+> All commands on **ubuntu-app**. Check your prompt says `student@ubuntu-app`.
 
 ---
 
@@ -19,7 +19,7 @@ What each part does:
 
 - **`php`** — the PHP language runtime.
 - **`libapache2-mod-php`** — lets Apache execute PHP files.
-- **`php-mysql`** — the driver so PHP can connect to MySQL.
+- **`php-mysql`** — the driver so PHP can connect to MySQL (including the **remote** MySQL on `ubuntu-db`).
 
 Confirm the version:
 
@@ -60,7 +60,7 @@ Save (**Ctrl+O**, Enter) and exit (**Ctrl+X**).
 From your **Windows browser**:
 
 ```
-http://<target-IP>/info.php
+http://<app-IP>/info.php
 ```
 
 You should see the purple **PHP information** page.
@@ -74,7 +74,7 @@ You should see the purple **PHP information** page.
 
 ---
 
-## 4. Confirm PHP can reach MySQL
+## 4. Confirm the MySQL driver is present
 
 On the phpinfo page (before deleting it) you could search for a **`mysqli`** or **`pdo_mysql`** section — its presence means the driver loaded. Or check from the command line:
 
@@ -86,6 +86,8 @@ You should see `mysqli` and `pdo_mysql` listed.
 
 📌 **Checkpoint:** `php -m | grep mysql` lists `mysqli` and/or `pdo_mysql`.
 
+> This confirms the *driver* is installed. It does **not** yet prove PHP can reach the database on `ubuntu-db` — that network connection is what file 11 sets up and tests.
+
 ---
 
 ## 5. Make sure index.php is preferred (optional but tidy)
@@ -94,16 +96,17 @@ By default Apache serves `index.html` before `index.php`. Since our app is `inde
 
 ---
 
-## 6. The LAMP stack is now complete
+## 6. The LAMP stack — spread across two machines
 
 ```
-L — Linux     (Ubuntu Server)        ✅ Day 1
-A — Apache    (web server)           ✅ file 09
-M — MySQL 8   (database)             ✅ file 07–08
-P — PHP       (application language) ✅ this file
+             ubuntu-app                         ubuntu-db
+L — Linux     (Ubuntu Server) ✅ Day 1           (Ubuntu Server) ✅ Day 1
+A — Apache    (web server)    ✅ file 09
+P — PHP       (app language)  ✅ this file
+M — MySQL 8                                       (database) ✅ file 07–08
 ```
 
-Everything is installed; next we prove they work **together**.
+This is the same **LAMP** stack — just with the **M** on its own server. Everything is installed; next we prove the app tier and the database tier work **together across the network**.
 
 ---
 

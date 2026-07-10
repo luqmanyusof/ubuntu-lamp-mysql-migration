@@ -1,10 +1,10 @@
 # 09 — Apache Setup
 
-**Goal:** Install the **Apache** web server on ubuntu-target, open the firewall for web traffic, and serve a page you can see from your Windows browser.
+**Goal:** Install the **Apache** web server on ubuntu-app, open the firewall for web traffic, and serve a page you can see from your Windows browser.
 
 **Time:** ~25 minutes
 
-> All commands on **ubuntu-target**. This is the **A** in LAMP.
+> All commands on **ubuntu-app**. Check your prompt says `student@ubuntu-app` — MySQL stays on `ubuntu-db`; the web tier lives here. This is the **A** in LAMP.
 
 ---
 
@@ -53,13 +53,13 @@ Apache Full                ALLOW IN    Anywhere
 
 📌 **Checkpoint:** `ufw status` lists both OpenSSH and Apache Full.
 
-> **Firewall thread so far:** Day 1 opened SSH (22); now Day 2 AM opens web (80/443). PM will open MySQL (3306) from the source IP only.
+> **Firewall thread so far:** Day 1 opened SSH (22) on both VMs; on `ubuntu-db` you opened MySQL (3306) *from this app server's IP only* (file 08); now on `ubuntu-app` you open web (80/443). Each machine exposes only what its role requires.
 
 ---
 
 ## 3. View the default page from Windows
 
-Find the target's IP:
+Find the app server's IP:
 
 ```bash
 $ ip a | grep inet
@@ -68,7 +68,7 @@ $ ip a | grep inet
 On your **Windows host**, open a browser and go to:
 
 ```
-http://<target-IP>
+http://<app-IP>
 ```
 
 You should see the **"Apache2 Ubuntu Default Page"**.

@@ -1,39 +1,43 @@
 # 12 — Migration Planning
 
-**Mode:** Instructor demo (trainees follow conceptually and take notes)
-**Goal:** Understand exactly *what* we're migrating, *how*, and *what can go wrong* — before touching any data.
+**Mode:** Instructor demo (trainees follow conceptually and take notes — **you do not migrate anything yourself**)
+**Goal:** Understand exactly *what* the trainer is migrating, *how*, and *what can go wrong* — before touching any data.
 
 **Time:** ~30–40 minutes discussion
 
+> **This is a demo.** The trainer runs it on a **separate CentOS → Ubuntu pair** (the real legacy database is on CentOS). Your own `ubuntu-app` / `ubuntu-db` from this morning are **not** involved and stay exactly as you left them. The full operational steps live in the trainer's runbook (`trainer-only/centos-mysql5-to-ubuntu-mysql8-migration.md`).
+
 ---
 
-## 1. What we are migrating (and what we are not)
+## 1. What is being migrated (and what is not)
 
 | | |
 |---|---|
-| **Migrating** | The **data and schema** of a MySQL **5.x** database on `ubuntu-source` → a MySQL **8** server on `ubuntu-target` |
-| **Type** | **Server-to-server** (two separate hosts) |
+| **Migrating** | The **data and schema** of a MySQL **5.x** database on a **CentOS** server (`centos-db`) → a fresh MySQL **8** server on a separate **Ubuntu** host (`ubuntu-db-new`) |
+| **Type** | **Server-to-server**, and also **cross-OS** (CentOS → Ubuntu) |
 | **NOT migrating** | The application. App migration is **out of scope.** |
 
-The sample PHP app from this morning is only proof the target stack works. The migration is purely database-to-database.
+The morning's two-tier app is only proof a target stack works. This migration is purely database-to-database.
 
 ---
 
 ## 2. The two servers, side by side
 
 ```
-   ubuntu-source                         ubuntu-target
+   centos-db (CentOS)                    ubuntu-db-new (Ubuntu)
    ┌────────────────┐                    ┌────────────────┐
    │  MySQL 5.x     │  ── dump file ──►  │  MySQL 8       │
    │  (old data)    │    (mysqldump)     │  (fresh)       │
    └────────────────┘                    └────────────────┘
 ```
 
-Our chosen method: **logical dump-and-load**.
+The chosen method: **logical dump-and-load**.
 
-1. On **source**, run `mysqldump` to produce a `.sql` file (schema + data as SQL statements).
+1. On the **CentOS source**, run `mysqldump` to produce a `.sql` file (schema + data as SQL statements).
 2. **Transfer** that file to the target (over SSH/`scp`).
-3. On **target**, **import** the file into MySQL 8.
+3. On the **Ubuntu target**, **import** the file into MySQL 8.
+
+> **Why logical (not a file copy)?** Physically copying MySQL data files across **different OSes and major versions** (CentOS 5.x → Ubuntu 8) is brittle and unsupported. A logical dump is plain SQL text — OS- and version-agnostic — which is exactly why it's the right tool for a cross-OS 5→8 move.
 
 ---
 
@@ -77,18 +81,18 @@ The mechanical steps take ~20–40 minutes. The *risk* is in the differences bet
 - ✅ **Snapshots** of both VMs taken right before this demo.
 - ✅ A **known-good dump** is on standby if the live dump misbehaves.
 - ✅ Clear **stopping point**: end of PM = data loaded in MySQL 8 (validation is tomorrow).
-- ✅ We never expose MySQL widely — 3306 opens **from the source IP only**, and only if the method needs it.
+- ✅ MySQL is never exposed widely — if a network path is opened at all, 3306 is scoped **from one source IP only** (and on CentOS that's a `firewall-cmd` rule, not UFW).
 
 ---
 
 ## 7. Pre-flight checklist (before file 13)
 
-- [ ] Source VM has a MySQL 5.x instance with a sample database to migrate
+- [ ] CentOS source has a MySQL 5.x instance with a sample database to migrate
 - [ ] You know the source DB name and a user that can read all of it
-- [ ] Target MySQL 8 is running (file 07) and secured (file 08)
-- [ ] Both VMs snapshotted
+- [ ] The separate Ubuntu MySQL 8 target is running and secured
+- [ ] Both hosts snapshotted
 - [ ] Known-good dump file is available on standby
 
-> **Trainer note (Luqman):** If the source doesn't yet have a MySQL 5.x sample DB, that setup happens as demo prep, not in front of the class. Have a representative schema — ideally one that *includes* at least one gotcha (a reserved-word column or a MyISAM table) so Day 3 has something real to fix.
+> **Trainer note (Luqman):** Full operational detail — CentOS `yum`/`firewalld`/SELinux, `my.cnf` paths, dump flags, rollback — is in `trainer-only/centos-mysql5-to-ubuntu-mysql8-migration.md`. Rehearse from that runbook. Seed the CentOS source with a representative schema that *includes* at least one gotcha (a reserved-word column or a MyISAM table) so Day 3 has something real to fix. This setup is demo prep, done before class, never live in front of trainees.
 
 Next: **`13-backup-and-dump.md`**.

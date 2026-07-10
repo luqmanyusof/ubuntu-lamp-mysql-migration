@@ -5,7 +5,7 @@
 
 **Time:** ~60 minutes
 
-> Use a snapshot (`day3-complete` or `day2-migration-loaded`) so you can break things freely and roll back. **Take a snapshot before deliberately breaking anything.**
+> Use a snapshot (`day3-complete` or `day2-two-tier`) so you can break things freely and roll back. **Take a snapshot before deliberately breaking anything.** Scenarios span both `ubuntu-app` and `ubuntu-db` — watch which VM each step is on.
 
 ---
 
@@ -50,9 +50,11 @@ $ sudo systemctl enable --now ssh
 
 ## 3. Scenario B — "The website shows a 500 / blank page"
 
+*(App config + code live on `ubuntu-app`.)*
+
 **Break it:** put a wrong password in `/var/www/appconfig.php`, or a PHP syntax error in `index.php`.
 
-**Diagnose:**
+**Diagnose (on `ubuntu-app`):**
 ```bash
 $ sudo tail -n 30 /var/log/apache2/error.log
 ```
@@ -66,7 +68,38 @@ $ sudo apachectl configtest && sudo systemctl reload apache2
 
 ---
 
-## 4. Scenario C — "MySQL won't start after a config change"
+## 3b. Scenario B2 — "The app can't reach the database server" (the two-tier classic)
+
+This is the failure unique to a two-tier setup: the code is fine, but `ubuntu-app` can't talk to MySQL on `ubuntu-db`.
+
+**Break it (pick one, on `ubuntu-db`):** remove the firewall rule (`sudo ufw delete` the 3306 line), or set `bind-address = 127.0.0.1` and restart MySQL, or change the app user's host so it no longer matches the app IP.
+
+**Diagnose — work outward-in from `ubuntu-app`:**
+```bash
+$ nc -zv <db-IP> 3306        # port reachable? timeout = firewall/bind problem
+$ mysql -h <db-IP> -u appuser -p appdb   # isolates auth from PHP
+```
+- `nc` **times out** → firewall closed to this app, or MySQL bound to localhost.
+- `nc` succeeds but login says `Access denied for 'appuser'@'<app-IP>'` → user host mismatch.
+
+**Fix (on `ubuntu-db`, matching the cause):**
+```bash
+$ sudo ufw allow from <app-IP> to any port 3306 proto tcp   # firewall
+# or set bind-address = 0.0.0.0 in mysqld.cnf, then:
+$ sudo systemctl restart mysql
+```
+```sql
+-- or repair the user host:
+mysql> RENAME USER 'appuser'@'wrong' TO 'appuser'@'<app-IP>';
+mysql> FLUSH PRIVILEGES;
+```
+**Confirm:** `nc` succeeds, the `mysql -h` login works, then the web page loads.
+
+> Lesson: three layers must line up — **firewall → bind-address → user host** (file 08 §5). Test them in that order and the fault localizes itself.
+
+---
+
+## 4. Scenario C — "MySQL won't start after a config change" (on `ubuntu-db`)
 
 **Break it:** add an invalid line to `mysqld.cnf` (e.g. `innodb_buffer_pool_size = 999G`).
 
@@ -86,7 +119,7 @@ $ sudo systemctl restart mysql
 
 ---
 
-## 5. Scenario D — "App can't connect: authentication plugin"
+## 5. Scenario D — "App can't connect: authentication plugin" (on `ubuntu-db`)
 
 **Break it:** create a user with `caching_sha2_password` and connect with an old client/driver that doesn't support it.
 
@@ -97,13 +130,13 @@ mysql> SELECT user, host, plugin FROM mysql.user WHERE user='legacyapp';
 
 **Fix (compatibility):**
 ```sql
-mysql> ALTER USER 'legacyapp'@'localhost'
+mysql> ALTER USER 'legacyapp'@'<app-IP>'
        IDENTIFIED WITH mysql_native_password BY 'Str0ng!';
 mysql> FLUSH PRIVILEGES;
 ```
 **Confirm:** the client connects.
 
-> Lesson: the #1 real-world 5→8 migration gotcha (file 15 §1).
+> Lesson: the #1 real-world 5→8 migration gotcha (file 15 §1) — and it can bite a two-tier app too if the app's MySQL driver is old.
 
 ---
 
@@ -153,6 +186,6 @@ When anything breaks, in order:
 4. Which layer? (network / service / auth / config / data)
 5. One change, test, confirm.
 
-📌 **Course complete.** You can install and secure Ubuntu, build a LAMP stack, migrate MySQL 5.x → 8, validate the result, harden it, and diagnose failures methodically.
+📌 **Course complete.** You can install and secure Ubuntu, build a **two-tier** LAMP stack (app and DB on separate servers, linked over a scoped network path), administer and harden it, understand how a MySQL 5.x → 8 migration is planned and validated, and diagnose failures methodically.
 
 > **Trainer note (Luqman):** Pick the scenarios that match the questions trainees actually asked during the three days — reinforce their real pain points. Leave 10 minutes at the end for open Q&A and to point them at the `day3-complete` snapshot as their reference build.

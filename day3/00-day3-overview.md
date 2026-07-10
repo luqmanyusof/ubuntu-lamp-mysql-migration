@@ -3,17 +3,18 @@
 **AM mode:** Instructor demo
 **PM mode:** Hands-on / discussion
 
-**Goal:** Complete the MySQL 5 → 8 migration properly (resolve differences, validate), then go deeper on MySQL administration and security hardening.
+**Goal:** Watch the trainer finish the MySQL 5 → 8 migration properly (resolve differences, validate), then go deeper — hands-on — on MySQL administration and hardening your own two-tier stack.
 
 ---
 
 ## Where we are
 
-Day 2 ended at snapshot `day2-migration-loaded`: the source data is inside MySQL 8 on the target, but **not yet validated** and possibly with a few 5→8 rough edges. Today we finish the job.
+- **Your stack:** the two-tier LAMP from Day 2 (`day2-two-tier` snapshot) — app on `ubuntu-app`, MySQL 8 on `ubuntu-db`.
+- **The demo:** the trainer's CentOS → Ubuntu migration ended at `day2-migration-loaded` — the CentOS data is inside MySQL 8 but **not yet validated** and possibly with a few 5→8 rough edges. This morning the trainer finishes it while you watch.
 
 ---
 
-## Morning (AM) — finish the migration, instructor demo
+## Morning (AM) — finish the migration demo, instructor-led
 
 | # | File | Covers |
 |---|------|--------|
@@ -33,21 +34,20 @@ Day 2 ended at snapshot `day2-migration-loaded`: the source data is inside MySQL
 
 ## The firewall thread — consolidation day
 
-Days 1–2 built up the rules (SSH 22, Apache 80/443, MySQL 3306-from-source). Today's **file 19** reviews the whole firewall posture in one place, confirms the principle of *least exposure*, and discusses production-grade choices (static IPs, disabling password SSH, closing 3306 again after migration).
+Days 1–2 built up the rules across two machines (SSH 22 on both; web 80/443 on `ubuntu-app`; MySQL 3306-from-app-IP on `ubuntu-db`). Today's **file 19** reviews the whole two-tier firewall posture in one place, confirms the principle of *least exposure*, and discusses production-grade choices (static IPs, disabling password SSH, keeping 3306 scoped to exactly the app server).
 
 ---
 
 ## Day 3 success checklist
 
-- [ ] 5→8 differences identified and resolved (reserved words, auth plugin, engine, charset)
-- [ ] Upgrade checker run; reported issues understood
-- [ ] Migration validated (row counts, checksums, key objects present)
-- [ ] (Optional) Sample app confirmed still reading migrated data — *see file 17*
-- [ ] Deeper MySQL admin practiced (backup, logs, config)
-- [ ] Full security hardening pass completed and firewall posture reviewed
+- [ ] (Demo) 5→8 differences identified and resolved (reserved words, auth plugin, engine, charset)
+- [ ] (Demo) Upgrade checker run; reported issues understood
+- [ ] (Demo) Migration validated (row counts, checksums, key objects present)
+- [ ] Deeper MySQL admin practiced on `ubuntu-db` (backup, logs, config)
+- [ ] Full two-tier hardening pass completed and firewall posture reviewed
 - [ ] Troubleshooting workshop scenarios worked through
-- [ ] Final snapshot `day3-complete` taken on both VMs
+- [ ] Final snapshot `day3-complete` taken on both `ubuntu-app` and `ubuntu-db`
 
-> **Pending decision (flagged in file 17):** whether to keep the optional "app still works" validation check. It's included but clearly marked optional — the trainer decides on the day based on time.
+> **Pending decision (flagged in file 17):** whether to keep the optional "app still works" validation check in the demo. It's included but clearly marked optional — the trainer decides on the day based on time.
 
-At the end of Day 3 the trainees can: install and secure Ubuntu, stand up a LAMP stack, migrate a MySQL 5.x database to MySQL 8, validate it, and harden the result.
+At the end of Day 3 the trainees can: install and secure Ubuntu, stand up a **two-tier** LAMP stack (app and DB on separate servers, linked over a scoped network path), administer and harden it — and they understand how a MySQL 5.x → 8 migration is planned, executed, and validated (having watched a real CentOS → Ubuntu one).

@@ -17,7 +17,7 @@ It's the official, Oracle-supported way to de-risk a 5→8 upgrade. Running it t
 
 ## 2. Install MySQL Shell
 
-MySQL Shell is a separate package from the server. Install it on the **target** (or wherever you can reach the source):
+MySQL Shell is a separate package from the server. Install it on the **Ubuntu target** (or wherever you can reach the CentOS source):
 
 ```bash
 $ sudo apt update
@@ -36,11 +36,11 @@ $ mysqlsh --version
 
 ## 3. Run the checker against the source (ideal: before migrating)
 
-The most useful run is against the **live source 5.x** server. From a machine that can reach it:
+The most useful run is against the **live CentOS 5.x** server. From a machine that can reach it:
 
 ```bash
 $ mysqlsh -- util check-for-server-upgrade \
-    { --user=root --host=<source-IP> --port=3306 } \
+    { --user=root --host=<centos-source-IP> --port=3306 } \
     --target-version=8.0.0 \
     --output-format=TEXT
 ```
@@ -48,13 +48,13 @@ $ mysqlsh -- util check-for-server-upgrade \
 Or interactively inside the shell:
 
 ```bash
-$ mysqlsh root@<source-IP>:3306
+$ mysqlsh root@<centos-source-IP>:3306
 ```
 ```js
  MySQL> util.checkForServerUpgrade();
 ```
 
-> **Firewall note:** reaching the source over 3306 needs that port open on the *source* for your checking host. If you'd rather not open it, run `mysqlsh` **on the source itself** against `localhost`.
+> **Firewall note:** reaching the CentOS source over 3306 needs that port open on it for your checking host — on CentOS that's a **`firewall-cmd`** rich rule scoped to the checking IP (not UFW). If you'd rather not open it, install `mysql-shell` **on the CentOS box** and run against `localhost`. See the trainer runbook.
 
 ---
 

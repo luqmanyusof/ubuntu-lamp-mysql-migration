@@ -1,17 +1,20 @@
-# 11 — Sample PHP + MySQL App
+# 11 — Link the App to the Remote Database
 
-**Goal:** Deploy a **one-page PHP app** on ubuntu-target that reads from and writes to MySQL 8 — proving the whole LAMP stack works end to end.
+**Goal:** Deploy a **one-page PHP app** on `ubuntu-app` that reads from and writes to **MySQL 8 on `ubuntu-db`** — proving the two tiers work together **over the network**.
 
-**Time:** ~40 minutes
+**Time:** ~45 minutes
 
-> All commands on **ubuntu-target**. This is the AM finale.
-> **Scope note:** this app exists only to demonstrate a working target stack. It is **not** the app being migrated — application migration is out of scope for this course.
+> This lab spans **both** VMs. Watch every command's header:
+> - 🟦 **on `ubuntu-db`** — create the table/data (the database lives here).
+> - 🟩 **on `ubuntu-app`** — write and serve the PHP app (the web tier lives here).
+>
+> You'll need both IPs: `<db-IP>` (ubuntu-db) and `<app-IP>` (ubuntu-app).
 
 ---
 
-## 1. Create a table and seed data
+## 1. 🟦 On `ubuntu-db` — create a table and seed data
 
-Log into MySQL and add a simple table to `appdb`:
+SSH into **ubuntu-db** and log into MySQL:
 
 ```bash
 $ sudo mysql
@@ -28,20 +31,49 @@ mysql> CREATE TABLE messages (
        );
 
 mysql> INSERT INTO messages (author, body) VALUES
-         ('System', 'LAMP stack is alive!'),
-         ('Trainer', 'If you can read this in the browser, MySQL 8 works.');
+         ('System', 'Two-tier LAMP is alive!'),
+         ('Trainer', 'If you can read this in the browser, the app reached ubuntu-db.');
 
 mysql> SELECT * FROM messages;
 mysql> EXIT;
 ```
 
-📌 **Checkpoint:** `SELECT * FROM messages;` shows two rows.
+📌 **Checkpoint:** `SELECT * FROM messages;` shows two rows on `ubuntu-db`.
 
 ---
 
-## 2. Store the DB credentials outside the web root (good practice)
+## 2. 🟩 On `ubuntu-app` — prove the network path *before* writing any PHP
 
-Never hard-code passwords inside a public web file if you can avoid it. Create a small config file **above** the web root:
+The most common two-tier failure is a blocked or misconfigured connection. Test it directly with the MySQL client first, so you debug the *link* separately from the *code*.
+
+Install just the client (no server) on `ubuntu-app`:
+
+```bash
+$ sudo apt install mysql-client -y
+```
+
+Now connect **across the network** to `ubuntu-db`, as the app user:
+
+```bash
+$ mysql -h <db-IP> -u appuser -p appdb
+Enter password: (the password you set in file 08)
+```
+
+At the prompt:
+
+```sql
+mysql> SELECT @@hostname;        -- should print: ubuntu-db  (you reached the other VM!)
+mysql> SELECT * FROM messages;   -- the two seeded rows
+mysql> EXIT;
+```
+
+📌 **Checkpoint:** From `ubuntu-app` you log into MySQL on `ubuntu-db` and see the messages. **If this fails, fix it now** using §6 before touching PHP — the web page can only work once this does.
+
+---
+
+## 3. 🟩 On `ubuntu-app` — store the DB credentials outside the web root
+
+Never hard-code passwords inside a public web file. Create a config file **above** the web root:
 
 ```bash
 $ sudo nano /var/www/appconfig.php
@@ -51,14 +83,16 @@ $ sudo nano /var/www/appconfig.php
 <?php
 // Not inside /var/www/html, so it can't be served directly.
 return [
-    'host' => '127.0.0.1',
+    'host' => '<db-IP>',        // ubuntu-db — the REMOTE database server
     'db'   => 'appdb',
     'user' => 'appuser',
-    'pass' => 'ChangeMe_Str0ng!',   // use the password you set in file 08
+    'pass' => 'ChangeMe_Str0ng!',   // the password you set in file 08
 ];
 ```
 
-Save and exit. Lock it down:
+> The single most important line here is `'host' => '<db-IP>'`. On a single-server app this would be `127.0.0.1`; in our two-tier setup it points across the network to `ubuntu-db`.
+
+Lock it down:
 
 ```bash
 $ sudo chown root:www-data /var/www/appconfig.php
@@ -69,7 +103,7 @@ $ sudo chmod 640 /var/www/appconfig.php
 
 ---
 
-## 3. Write the app page
+## 4. 🟩 On `ubuntu-app` — write the app page
 
 Remove the default HTML page and create the PHP app:
 
@@ -84,7 +118,7 @@ Paste:
 <?php
 $cfg = require '/var/www/appconfig.php';
 
-// Connect using mysqli
+// Connect to the REMOTE MySQL on ubuntu-db using mysqli
 $mysqli = new mysqli($cfg['host'], $cfg['user'], $cfg['pass'], $cfg['db']);
 if ($mysqli->connect_errno) {
     http_response_code(500);
@@ -106,10 +140,11 @@ $result = $mysqli->query('SELECT author, body, created_at FROM messages ORDER BY
 ?>
 <!doctype html>
 <html>
-<head><meta charset="utf-8"><title>LAMP Demo</title></head>
+<head><meta charset="utf-8"><title>Two-Tier LAMP Demo</title></head>
 <body style="font-family: sans-serif; max-width: 600px; margin: 2rem auto;">
-  <h1>LAMP Demo App</h1>
-  <p>Served by Apache + PHP, data from MySQL 8.</p>
+  <h1>Two-Tier LAMP Demo</h1>
+  <p>Page served by Apache + PHP on <strong>ubuntu-app</strong>;
+     data stored in MySQL 8 on <strong>ubuntu-db</strong>.</p>
 
   <form method="post">
     <input name="author" placeholder="Your name" required>
@@ -134,49 +169,71 @@ $result = $mysqli->query('SELECT author, body, created_at FROM messages ORDER BY
 Save and exit.
 
 > **Teaching points in this code:**
+> - The app connects to a **remote** host (`$cfg['host']` = `ubuntu-db`), not localhost.
 > - **Prepared statements** (`prepare` + `bind_param`) prevent SQL injection.
 > - **`htmlspecialchars`** on output prevents cross-site scripting (XSS).
 > - Credentials live **outside** the web root.
-> These are the same habits we reinforce in the Day 3 security lab.
 
 ---
 
-## 4. See it in the browser
+## 5. See it in the browser
 
 From your **Windows host**:
 
 ```
-http://<target-IP>/
+http://<app-IP>/
 ```
 
-You should see the heading, the two seeded messages, and a form. **Add a message** — it should appear at the top of the list after submitting.
+You should see the heading, the two seeded messages, and a form. **Add a message** — it appears at the top after submitting.
 
-📌 **Checkpoint:** You can read the seeded rows **and** add a new one that persists (refresh — it's still there because it's in MySQL).
+📌 **Checkpoint:** You read the seeded rows **and** add a new one that persists. Refresh — it's still there, because it lives in MySQL on `ubuntu-db`. To *prove* it crossed the network, check on `ubuntu-db`:
+
+```sql
+mysql> SELECT * FROM appdb.messages ORDER BY id DESC LIMIT 3;   -- your new row is here
+```
 
 ---
 
-## 5. If something breaks
+## 6. If the connection fails — debug the link by layer
+
+`Database connection failed` almost always means the network path is broken. Check, in order:
 
 ```bash
-$ sudo tail -n 30 /var/log/apache2/error.log
+# 🟩 on ubuntu-app — can you even reach the port?
+$ nc -zv <db-IP> 3306          # "succeeded" = firewall+bind OK; "timed out" = blocked
 ```
 
-Common causes:
-- Wrong password in `appconfig.php` → connection failed message.
-- Table not created → check `USE appdb; SHOW TABLES;`.
-- Blank page → PHP error; check the log above.
+| Symptom | Likely cause | Fix (on `ubuntu-db`) |
+|---------|--------------|----------------------|
+| `nc` times out | Firewall not open to this app, or MySQL bound to localhost | `sudo ufw allow from <app-IP> to any port 3306`; set `bind-address = 0.0.0.0` (file 08 §3–4) |
+| `Access denied for user 'appuser'@'<app-IP>'` | User host doesn't match the app's real IP | Recreate `'appuser'@'<real-app-IP>'` or use `'appuser'@'subnet.%'` (file 08 §2) |
+| `Unknown database 'appdb'` | DB not created on `ubuntu-db` | `CREATE DATABASE appdb ...` (file 08 §2) |
+| Wrong password | Mismatch with `appconfig.php` | Fix the password in either place |
+
+Also check the app's own error log:
+
+```bash
+$ sudo tail -n 30 /var/log/apache2/error.log     # on ubuntu-app
+```
+
+> **Lesson:** in a two-tier app, "it can't connect" is a **layered** problem — port (firewall/bind) → auth (user host/password) → database → query. Test each layer in that order and you'll never guess.
 
 ---
 
-## Morning wrap-up
+## Morning wrap-up — snapshot the working two-tier stack
 
-You've built and verified a complete LAMP stack:
+You've built and verified a two-tier LAMP setup:
 
-- [ ] Apache serves the page over HTTP
-- [ ] PHP renders it dynamically
-- [ ] MySQL 8 stores and returns data
-- [ ] You can add a record through the browser
+- [ ] Apache + PHP serve the page from `ubuntu-app`
+- [ ] MySQL 8 on `ubuntu-db` stores the data
+- [ ] The app connects **across the network**, scoped by firewall + user host
+- [ ] You can add a record through the browser and see it on `ubuntu-db`
 
-> **Trainer note (Luqman):** This is the clean handoff to the PM session. Take a **snapshot of ubuntu-target now** named `day2-lamp-ready` before the migration demo — so if the demo goes sideways, we can return to a known-good LAMP target.
+Take a snapshot on **both** VMs now:
 
-Next (PM, instructor demo): **`12-migration-planning.md`** — plan the MySQL 5 → 8 migration.
+- Name: **`day2-two-tier`**
+- Description: `Two-tier LAMP working: app on ubuntu-app, MySQL 8 on ubuntu-db`
+
+> **Trainer note (Luqman):** This is the clean handoff to the PM session. With the participants' stack snapshotted, the afternoon migration demo (which you run on your *own* CentOS→Ubuntu pair) can't affect their boxes. If anyone's link is flaky, fix it against `day2-two-tier` before lunch.
+
+Next (PM, instructor demo): **`12-migration-planning.md`** — plan the MySQL 5 → 8 migration you'll watch the trainer perform.

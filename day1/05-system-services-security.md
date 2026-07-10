@@ -73,16 +73,16 @@ ssh student@192.168.1.50
 You should land at:
 
 ```
-student@ubuntu-source:~$
+student@ubuntu-app:~$
 ```
 
 You're now controlling the VM from Windows. 🎉
 
-📌 **Checkpoint:** You can open a PowerShell window on Windows and SSH into **both** `ubuntu-source` and `ubuntu-target`.
+📌 **Checkpoint:** You can open a PowerShell window on Windows and SSH into **both** `ubuntu-app` and `ubuntu-db`.
 
 > ⚠️ **Bridged IP changed?** If SSH suddenly can't connect after a reboot, the DHCP IP may have changed — re-check with `ip a` on the console. (Static IPs are covered on Day 3.)
 
-> **Trainer note (Luqman):** Get everyone SSH-ing in successfully before moving to the firewall. Two terminals side by side — one for `source`, one for `target` — is how we'll work for the rest of the course.
+> **Trainer note (Luqman):** Get everyone SSH-ing in successfully before moving to the firewall. Two terminals side by side — one for `ubuntu-app`, one for `ubuntu-db` — is how we'll work for the rest of the course. This habit *is* the two-tier lesson: the app machine and the database machine are separate, and you administer each over its own SSH session.
 
 ### B3. (Optional but recommended) SSH keys instead of passwords
 
@@ -179,8 +179,8 @@ $ sudo ufw disable             # turn the firewall off entirely
 ```
 
 > **The firewall thread continues:**
-> - **Day 2 AM** — allow Apache: `sudo ufw allow 'Apache Full'` (ports 80/443)
-> - **Day 2 PM** — allow MySQL from the source VM only: `sudo ufw allow from <source-IP> to any port 3306`
+> - **Day 2 (on `ubuntu-app`)** — allow web: `sudo ufw allow 'Apache Full'` (ports 80/443)
+> - **Day 2 (on `ubuntu-db`)** — allow MySQL **from the app server only**: `sudo ufw allow from <app-IP> to any port 3306`
 > - **Day 3** — consolidated hardening review
 
 ---
@@ -214,6 +214,6 @@ For **each** VM, in VirtualBox Manager:
 - [ ] System fully updated
 - [ ] `day1-clean` snapshot taken
 
-If every box is ticked on **both** `ubuntu-source` and `ubuntu-target`, **Day 1 is complete.** 🎯
+If every box is ticked on **both** `ubuntu-app` and `ubuntu-db`, **Day 1 is complete.** 🎯
 
-Tomorrow (Day 2) we build the LAMP stack and a working PHP app on the target, then begin the MySQL migration.
+Tomorrow (Day 2) we install MySQL 8 on `ubuntu-db`, Apache + PHP on `ubuntu-app`, and wire the app to the database **across the network** — then watch the trainer's MySQL 5 → 8 migration demo.

@@ -1,10 +1,11 @@
-# 08 — MySQL Security Basics
+# 08 — MySQL Security + Exposing It to the App (Safely)
 
-**Goal:** Harden the fresh MySQL 8 install, then create a **database** and an **application user** with correct privileges — the account our PHP app will use.
+**Goal:** Harden the fresh MySQL 8 install, create a **database** and a **remote application user**, then open MySQL to the network **only** for `ubuntu-app` — via `bind-address` and a tightly scoped firewall rule.
 
-**Time:** ~30 minutes
+**Time:** ~40 minutes
 
-> All commands on **ubuntu-target**.
+> All commands on **ubuntu-db**. Check your prompt says `student@ubuntu-db`.
+> You'll need **`ubuntu-app`'s IP address** in this lab — have it written down (`ip a` on `ubuntu-app`). We call it `<app-IP>`.
 
 ---
 
@@ -26,13 +27,13 @@ Answer as follows:
 | Remove test database? | `y` | The default `test` DB is world-accessible |
 | Reload privilege tables now? | `y` | Apply changes immediately |
 
-> **Note on the root password prompt:** Because Ubuntu's `root` uses `auth_socket`, the wizard may not ask you to set a root password — that's expected. We keep `root` on socket auth (log in with `sudo mysql`). We do **not** switch root to password auth; it's more secure as-is.
+> **Note on the root password prompt:** Because Ubuntu's `root` uses `auth_socket`, the wizard may not ask you to set a root password — that's expected. We keep `root` on socket auth (log in with `sudo mysql`) and never expose it to the network.
 
 📌 **Checkpoint:** The script finishes with "All done!".
 
 ---
 
-## 2. Create the application database and user
+## 2. Create the application database and a *remote* user
 
 Log in:
 
@@ -46,75 +47,120 @@ Create a database for our sample app:
 mysql> CREATE DATABASE appdb CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
 ```
 
-> We explicitly set **utf8mb4** — the MySQL 8 default, full 4-byte Unicode (emoji, all languages). Good habit for every new database.
+> We explicitly set **utf8mb4** — the MySQL 8 default, full 4-byte Unicode. Good habit for every new database.
 
-Create a dedicated **application user** (never let the app use root):
+Now the key difference from a single-server setup: our app runs on **`ubuntu-app`**, a *different machine*. So the user's host is **`ubuntu-app`'s IP**, not `localhost`:
 
 ```sql
-mysql> CREATE USER 'appuser'@'localhost' IDENTIFIED BY 'ChangeMe_Str0ng!';
+mysql> CREATE USER 'appuser'@'<app-IP>' IDENTIFIED BY 'ChangeMe_Str0ng!';
 ```
 
 Grant it rights **only** on `appdb` (least privilege):
 
 ```sql
-mysql> GRANT SELECT, INSERT, UPDATE, DELETE ON appdb.* TO 'appuser'@'localhost';
+mysql> GRANT SELECT, INSERT, UPDATE, DELETE ON appdb.* TO 'appuser'@'<app-IP>';
 mysql> FLUSH PRIVILEGES;
 ```
 
-> ⚠️ Replace `ChangeMe_Str0ng!` with your own strong password and remember it — the PHP app in file 11 will use it.
+> ⚠️ Replace `<app-IP>` with the real IP of `ubuntu-app` (e.g. `192.168.1.50`), and `ChangeMe_Str0ng!` with your own strong password. The PHP app in file 11 uses both.
+
+> **DHCP tip:** if the app's IP changes on reboot and login starts failing, either re-create the user with the new IP, or scope it to the subnet: `'appuser'@'192.168.1.%'`. Tighter (single IP) is better; subnet is a pragmatic fallback.
 
 Verify:
 
 ```sql
-mysql> SHOW GRANTS FOR 'appuser'@'localhost';
+mysql> SELECT user, host FROM mysql.user WHERE user='appuser';
+mysql> SHOW GRANTS FOR 'appuser'@'<app-IP>';
 mysql> EXIT;
 ```
 
-📌 **Checkpoint:** `SHOW GRANTS` lists SELECT/INSERT/UPDATE/DELETE on `appdb.*` for `appuser`.
+📌 **Checkpoint:** `appuser` exists with host = `<app-IP>`, and `SHOW GRANTS` lists SELECT/INSERT/UPDATE/DELETE on `appdb.*`.
 
 ---
 
-## 3. Test the new user
+## 3. Bind MySQL to the network
 
-Log in **as the app user** (not via sudo) to prove the credentials work:
+Right now MySQL only listens on `127.0.0.1`, so `ubuntu-app` can't reach it. Change the bind address:
 
 ```bash
-$ mysql -u appuser -p appdb
-Enter password: (type the app user's password)
+$ sudo nano /etc/mysql/mysql.conf.d/mysqld.cnf
 ```
 
-At the prompt:
+Find the line:
 
-```sql
-mysql> SELECT DATABASE();     -- should print: appdb
-mysql> SHOW TABLES;           -- empty for now, that's fine
-mysql> EXIT;
+```
+bind-address = 127.0.0.1
 ```
 
-📌 **Checkpoint:** You can log in as `appuser` and land inside `appdb`.
+Change it to listen on all interfaces:
+
+```
+bind-address = 0.0.0.0
+```
+
+> **Why `0.0.0.0` and not the VM's own IP?** On a DHCP-addressed VM the IP can change; `0.0.0.0` avoids MySQL failing to start when that happens. We are **not** relying on the bind address for security — the **firewall** (next step) plus the **`@'<app-IP>'` user** are what actually restrict access. Defence in layers.
+
+Restart and confirm it's now listening on the network:
+
+```bash
+$ sudo systemctl restart mysql
+$ sudo ss -tlnp | grep 3306          # should show 0.0.0.0:3306 (not 127.0.0.1:3306)
+```
+
+📌 **Checkpoint:** `ss` shows MySQL listening on `0.0.0.0:3306`.
 
 ---
 
-## 4. Understanding the `@'localhost'` choice
+## 4. Firewall thread — open 3306 to the app server *only*
 
-We created `appuser@'localhost'` — it can connect **only from the target machine itself**. Our PHP app runs on the same machine, so localhost is exactly right and keeps the account off the network entirely.
+MySQL now listens on the network, but the firewall must still let `ubuntu-app` in — and **nobody else**:
 
-Contrast with the **migration user** we'll create later, which may need a specific host/IP. Same principle, scoped as tightly as the task allows.
+```bash
+$ sudo ufw allow from <app-IP> to any port 3306 proto tcp
+$ sudo ufw status
+```
+
+Expected — SSH (from Day 1) plus a **scoped** MySQL rule:
+
+```
+To                         Action      From
+--                         ------      ----
+22/tcp (OpenSSH)           ALLOW IN    Anywhere
+3306/tcp                   ALLOW IN    <app-IP>
+```
+
+> ⚠️ **Never** `sudo ufw allow 3306` on its own — that opens your database to the entire network. Always scope it `from <app-IP>`. Notice the `From` column shows the specific IP, not `Anywhere`.
+
+📌 **Checkpoint:** `ufw status` shows 3306 allowed **only** from `<app-IP>`.
 
 ---
 
-## 5. Security habits recap
+## 5. Understanding the three layers you just built
+
+Reaching this database from the app now requires **all three** to line up — that's the point:
+
+| Layer | What it enforces | Set in |
+|-------|------------------|--------|
+| **Firewall** (UFW) | Only packets from `<app-IP>` reach port 3306 | §4 |
+| **`bind-address`** | MySQL listens on the network at all | §3 |
+| **User host** `'appuser'@'<app-IP>'` | MySQL only *authenticates* a login coming from that IP | §2 |
+
+A single-server app would use `'appuser'@'localhost'` and no open port. A two-tier app trades that for a **narrow, deliberate** network path. We verify the whole path end-to-end from `ubuntu-app` in file 11.
+
+---
+
+## 6. Security habits recap
 
 - ✅ App uses a **dedicated least-privilege user**, never root.
-- ✅ Passwords meet the validation policy.
-- ✅ Anonymous users and the `test` DB removed.
-- ✅ root cannot log in remotely.
+- ✅ The app user is scoped to the **app server's IP**, not the world.
+- ✅ Port 3306 is open to **one source IP only**.
+- ✅ Anonymous users and the `test` DB removed; root not remotely reachable.
 - ✅ New DB uses `utf8mb4`.
 
-These same principles get expanded in the Day 3 hardening lab (file 19).
+These get expanded in the Day 3 hardening lab (file 19).
 
 ---
 
 ## Done
 
-MySQL 8 is secured and ready with `appdb` + `appuser`. Next: **`09-apache-setup.md`** — install the web server.
+MySQL 8 is secured, exposed only to `ubuntu-app`, and ready with `appdb` + a remote `appuser`. Now switch to **`ubuntu-app`** for **`09-apache-setup.md`** — install the web server.
