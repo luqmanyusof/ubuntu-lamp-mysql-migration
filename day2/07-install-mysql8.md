@@ -1,10 +1,22 @@
 # 07 — Install MySQL 8 Community
 
-**Goal:** Install and run **MySQL 8 Community Server** on **ubuntu-db**, confirm it's running, and log in for the first time.
+**Goal:** Install and run **MySQL 8 Community Server** on **both** database VMs, confirm it's running, and log in for the first time.
 
-**Time:** ~30 minutes
+**Time:** ~40 minutes (you'll do this twice)
 
-> All commands run on **ubuntu-db** (SSH in from Windows). Check your prompt says `student@ubuntu-db`.
+> ## ⚠️ Run this file **twice** — once on each database VM
+>
+> You have two database servers, and both need MySQL 8:
+>
+> | VM | Role | What it holds by the end of today |
+> |----|------|-----------------------------------|
+> | 🟦 **`ubuntu-old-db`** | The **source** — your app's live database | `appdb` with the three-table schema and data |
+> | 🟪 **`ubuntu-new-db`** | The **target** — where you'll copy it to | Empty at first; receives the copy in files 12–14 |
+>
+> **Do `ubuntu-old-db` first, get it working end-to-end, then repeat on `ubuntu-new-db`.** The steps are identical — same commands, same checkpoints. Doing it twice is not busywork: the second pass is much faster, and it's how you'll *know* you understood the first.
+>
+> Check your prompt (`student@ubuntu-old-db` vs `student@ubuntu-new-db`) before **every** command in this file.
+
 > **Edition:** we use **MySQL 8 Community**. (Enterprise is a later decision and installs from a different repository; nothing in this course depends on Enterprise.)
 
 ---

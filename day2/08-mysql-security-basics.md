@@ -4,8 +4,18 @@
 
 **Time:** ~40 minutes
 
-> All commands on **ubuntu-db**. Check your prompt says `student@ubuntu-db`.
-> You'll need **`ubuntu-app`'s IP address** in this lab — have it written down (`ip a` on `ubuntu-app`). We call it `<app-IP>`.
+> ## ⚠️ Run the hardening steps (§1–§4) on **both** database VMs
+>
+> Like file 07, this file applies to 🟦 **`ubuntu-old-db`** *and* 🟪 **`ubuntu-new-db`**. A server you're about to trust with a copy of your data must be **just as secure as the one it came from** — an unhardened `new-db` is a fresh way into the same data.
+>
+> | Section | `ubuntu-old-db` | `ubuntu-new-db` |
+> |---------|-----------------|-----------------|
+> | §1–§4 — harden, `bind-address`, firewall | ✅ do it | ✅ do it |
+> | §5 onward — create `appdb` + `appuser` | ✅ do it (this is the live database) | ⏳ **not yet** — `new-db` gets its database in file 12, and its `appuser` at cutover in file 14 |
+>
+> Check your prompt before every command.
+
+> You'll need **`ubuntu-app`'s IP address** in this lab — the **host-only** `192.168.56.x` one, not `10.0.2.15` (see file 09 §3). We call it `<app-IP>`.
 
 ---
 
@@ -163,4 +173,4 @@ These get expanded in the Day 3 hardening lab (file 19).
 
 ## Done
 
-MySQL 8 is secured, exposed only to `ubuntu-app`, and ready with `appdb` + a remote `appuser`. Now switch to **`ubuntu-app`** for **`09-apache-setup.md`** — install the web server.
+MySQL 8 is secured on **both** database VMs, exposed only to `ubuntu-app`, and `ubuntu-old-db` is ready with `appdb`. Now switch to **`ubuntu-app`** for **`09-nginx-setup.md`** — install the web server.
