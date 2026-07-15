@@ -74,39 +74,90 @@ The mechanics take minutes. The failures are all in the **structure**, and the n
 
 ---
 
-## 5. Pre-flight — prepare `ubuntu-new-db` now
+## 5. Reference — rename a host (`ubuntu-old-db` → `ubuntu-new-db`)
 
-🟪 **On `ubuntu-new-db`.** (Your prompt should read `student@ubuntu-new-db`.)
+If you built `ubuntu-new-db` by **cloning `ubuntu-old-db`** in VirtualBox, the clone comes up still calling itself `ubuntu-old-db`. Rename it before you go further — otherwise both VMs answer to the same name and your prompts lie about which machine you're on. Changing a hostname is one command plus one local file.
 
-MySQL 8 should already be installed here (same steps as file 07). Confirm it's running, then create the **empty** target database:
+**1. Set the new hostname.** `hostnamectl` applies it instantly — no reboot needed:
 
 ```bash
-$ systemctl status mysql          # active (running)
-$ sudo mysql
+$ sudo hostnamectl set-hostname ubuntu-new-db
 ```
 
-```sql
-mysql> CREATE DATABASE appdb CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
-mysql> SHOW DATABASES;            -- appdb is listed, and empty
-mysql> USE appdb;
-mysql> SHOW TABLES;               -- Empty set
-mysql> EXIT;
+> Use only lowercase letters, numbers, and hyphens.
+
+**2. Update the hosts file.** So `sudo` and other local services don't throw *"unable to resolve host"* warnings, fix the `127.0.1.1` mapping in `/etc/hosts`:
+
+```bash
+$ sudo nano /etc/hosts
 ```
 
-📌 **Checkpoint:** `appdb` exists on `ubuntu-new-db` and contains **no tables**.
+Find the line mapping the old hostname to `127.0.1.1`:
 
-> **Why create it with an explicit charset?** So the target's default can't quietly differ from the source's. This is risk #4, pre-empted in one line.
-
-Now record the numbers you're copying — 🟦 on **`ubuntu-old-db`**:
-
-```sql
-mysql> SELECT
-         (SELECT COUNT(*) FROM appdb.departments) AS departments,
-         (SELECT COUNT(*) FROM appdb.employees)   AS employees,
-         (SELECT COUNT(*) FROM appdb.projects)    AS projects;
+```
+127.0.1.1   ubuntu-old-db
 ```
 
-Expect **4 / 6 / 5** (plus any employees you added through the form). **Write these down.** They are the first thing you check on the other side.
+Change `ubuntu-old-db` to `ubuntu-new-db`. Save and exit (**Ctrl+O**, Enter, then **Ctrl+X**).
+
+**3. Verify the change:**
+
+```bash
+$ hostnamectl
+```
+
+To see the updated name in your shell prompt, log out of the SSH session and back in:
+
+```bash
+$ exit
+```
+
+📌 **Checkpoint:** `hostnamectl` reports the **Static hostname** as `ubuntu-new-db`, and after reconnecting the prompt shows `student@ubuntu-new-db`.
+
+---
+
+### If the two VMs share an IP — change it (cloned VMs)
+
+A clone can also inherit the **same host-only IP** as its source, or a static one baked into netplan. Two VMs on `192.168.56.x` with the *same* address will clash — `scp` and the remote pull in files 13–14 go to the wrong box, or fail. Give `ubuntu-new-db` its own address.
+
+First see what it currently has:
+
+```bash
+$ ip -4 addr show enp0s8 | grep inet     # the host-only 192.168.56.x — NOT 10.0.2.15
+```
+
+**If the address is a duplicate or you simply want a fixed one,** edit the netplan config (Ubuntu 24.04):
+
+```bash
+$ ls /etc/netplan/                        # e.g. 50-cloud-init.yaml or 01-netcfg.yaml
+$ sudo nano /etc/netplan/50-cloud-init.yaml
+```
+
+Set a **unique** static address on the host-only adapter (`enp0s8`) — leave the NAT adapter (`enp0s3`) on DHCP for internet:
+
+```yaml
+network:
+  version: 2
+  ethernets:
+    enp0s3:                     # NAT — internet, leave as DHCP
+      dhcp4: true
+    enp0s8:                     # host-only — give this a unique fixed IP
+      dhcp4: false
+      addresses: [192.168.56.103/24]
+```
+
+> Pick a `192.168.56.x` that nothing else uses — e.g. `.101` app, `.102` old-db, `.103` new-db. YAML is indent-sensitive: **spaces only, no tabs.**
+
+Apply it and confirm:
+
+```bash
+$ sudo netplan apply
+$ ip -4 addr show enp0s8 | grep inet       # now shows your chosen address
+```
+
+> ⚠️ Changing the IP breaks any SSH session using the old one — reconnect to the new address. And any firewall rule or MySQL user scoped to the old IP (`'appuser'@'<old-IP>'`, `ufw allow from <old-IP>`) must be updated to match — the **three-layer rule** from file 11 still applies.
+
+📌 **Checkpoint:** Each VM has a **distinct** `192.168.56.x` address, and you can `ssh` between them by those addresses.
 
 ---
 
