@@ -5,7 +5,7 @@
 
 **Time:** ~50 minutes
 
-> All hands-on on **ubuntu-db** (your database tier). Check your prompt says `student@ubuntu-db`.
+> All hands-on on a **database VM**. Use **`ubuntu-new-db`** — it's the live server the app now talks to — and check your prompt says `student@ubuntu-new-db`. Everything here applies equally to `ubuntu-old-db`; they're identical MySQL 8 installs.
 
 ---
 

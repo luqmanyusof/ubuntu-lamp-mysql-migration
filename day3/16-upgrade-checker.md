@@ -1,9 +1,11 @@
 # 16 — Upgrade Checker
 
-**Mode:** Instructor demo
-**Goal:** Use **MySQL Shell's Upgrade Checker** to automatically detect 5→8 compatibility problems *before* (or alongside) migrating — turning the manual list from file 15 into a generated report.
+**Mode:** Discussion / optional hands-on (cover if time permits)
+**Goal:** Use **MySQL Shell's Upgrade Checker** to automatically detect 5→8 compatibility problems *before* migrating — turning the manual list from file 15 into a generated report.
 
 **Time:** ~30 minutes
+
+> **This is a cross-version tool**, so it belongs to the same "real upgrade" story as file 15 — not to your same-version copy. You *can* run it against your own `ubuntu-old-db` (§3) and it will come back clean, which is itself instructive: a clean report is what a same-version move looks like. The interesting output only appears when the source is MySQL 5.x, as in the trainer's CentOS migration.
 
 ---
 
@@ -34,9 +36,20 @@ $ mysqlsh --version
 
 ---
 
-## 3. Run the checker against the source (ideal: before migrating)
+## 3. Run the checker
 
-The most useful run is against the **live CentOS 5.x** server. From a machine that can reach it:
+**Try it on your own `ubuntu-old-db`** to see what a *clean* report looks like — install `mysql-shell` there and run against localhost:
+
+```bash
+$ mysqlsh root@localhost:3306
+```
+```js
+ MySQL> util.checkForServerUpgrade();
+```
+
+Because `old-db` is already MySQL 8, the report will show **0 errors** — the "nothing to fix" baseline. That's exactly why your copy to `new-db` was uneventful.
+
+**The revealing run is against a MySQL 5.x source** — the trainer's CentOS server. From a machine that can reach it:
 
 ```bash
 $ mysqlsh -- util check-for-server-upgrade \
@@ -45,16 +58,7 @@ $ mysqlsh -- util check-for-server-upgrade \
     --output-format=TEXT
 ```
 
-Or interactively inside the shell:
-
-```bash
-$ mysqlsh root@<centos-source-IP>:3306
-```
-```js
- MySQL> util.checkForServerUpgrade();
-```
-
-> **Firewall note:** reaching the CentOS source over 3306 needs that port open on it for your checking host — on CentOS that's a **`firewall-cmd`** rich rule scoped to the checking IP (not UFW). If you'd rather not open it, install `mysql-shell` **on the CentOS box** and run against `localhost`. See the trainer runbook.
+> **Firewall note:** reaching the CentOS source over 3306 needs that port open on it for the checking host — on CentOS that's a **`firewall-cmd`** rich rule scoped to the checking IP (not UFW). Or install `mysql-shell` **on the CentOS box** and run against `localhost`. See the trainer runbook.
 
 ---
 
@@ -98,11 +102,13 @@ A clean checker run is your green light that the import will go smoothly.
 
 ---
 
-## 6. Where this fits our timeline
+## 6. Where this fits a real project
 
-In an ideal project you run the checker **before** taking the dump (Day 2). We introduce it on Day 3 for teaching flow — but state clearly: *in real projects, run the upgrade checker first, fix at the source, then dump.* It prevents most of the file-14 import errors entirely.
+For a genuine cross-version upgrade, the checker runs **first** — before you ever take the dump: run it, fix issues at the source, *then* dump the corrected database. Doing it in that order prevents import errors entirely, rather than discovering them mid-load.
 
-> **Trainer note (Luqman):** If you pre-seeded the source with a reserved-word column and a utf8mb3/MyISAM table (as suggested in file 12), the checker will light up with exactly those — a satisfying, concrete demo. Show the report, fix one item live, re-run to show it disappear.
+Your Day 2 copy skipped this step legitimately: same-version moves have nothing for the checker to find. But make the habit explicit — *the first action in any 5→8 project is to run the upgrade checker against the source.*
+
+> **Trainer note (Luqman):** For a live demo, run it against your CentOS 5.x source seeded with a reserved-word column and a utf8mb3/MyISAM table — the checker lights up with exactly those. Show the report, fix one item, re-run to show it disappear. Contrast with the clean `ubuntu-old-db` run participants can do themselves.
 
 ---
 

@@ -1,26 +1,38 @@
-# Day 3 — Finish Migration + Deepen LAMP & Security
+# Day 3 — Validate, Deepen & Harden
 
-**AM mode:** Instructor demo
+**AM mode:** Hands-on validation + discussion
 **PM mode:** Hands-on / discussion
 
-**Goal:** Watch the trainer finish the MySQL 5 → 8 migration properly (resolve differences, validate), then go deeper — hands-on — on MySQL administration and hardening your own two-tier stack.
+**Goal:** Prove yesterday's database copy was correct, understand what a *cross-version* migration adds on top, then go deeper — hands-on — on MySQL administration and hardening all three servers.
 
 ---
 
 ## Where we are
 
-- **Your stack:** the two-tier LAMP from Day 2 (`day2-two-tier` snapshot) — app on `ubuntu-app`, MySQL 8 on `ubuntu-db`.
-- **The demo:** the trainer's CentOS → Ubuntu migration ended at `day2-migration-loaded` — the CentOS data is inside MySQL 8 but **not yet validated** and possibly with a few 5→8 rough edges. This morning the trainer finishes it while you watch.
+Day 2 left you with a working three-VM setup and a completed copy:
+
+```
+   ubuntu-app                 ubuntu-old-db              ubuntu-new-db
+   ┌──────────────┐           ┌──────────────┐           ┌──────────────┐
+   │ Nginx + PHP  │ ── SQL ──►│  MySQL 8     │  copied ─►│  MySQL 8     │
+   │ (cut over ───┼───────────┼──────────────┼──────────►│  appdb       │
+   │  to new-db)  │           │  appdb       │           │  (now live)  │
+   └──────────────┘           └──────────────┘           └──────────────┘
+```
+
+The app is serving from `ubuntu-new-db`. But "it works" is not the same as "the copy was correct" — you haven't *proven* the schema and data survived intact. That's this morning's first job.
 
 ---
 
-## Morning (AM) — finish the migration demo, instructor-led
+## Morning (AM) — validate, and understand cross-version migration
 
-| # | File | Covers |
-|---|------|--------|
-| 15 | `15-mysql5-vs-mysql8-differences.md` | The real differences and how to fix each |
-| 16 | `16-upgrade-checker.md` | Use MySQL Shell's upgrade checker to find issues automatically |
-| 17 | `17-post-migration-validation.md` | Prove the migration is complete and correct |
+| # | File | Mode | Covers |
+|---|------|------|--------|
+| 17 | `17-post-migration-validation.md` | **hands-on** | **Prove your copy is correct** — schema `diff`, row counts, checksums (`old-db` vs `new-db`) |
+| 15 | `15-mysql5-vs-mysql8-differences.md` | discussion | What a real **5→8** migration must fix — the differences your same-version copy didn't hit |
+| 16 | `16-upgrade-checker.md` | discussion | MySQL Shell's upgrade checker: find those issues automatically |
+
+> **Do file 17 first — it's the hands-on payoff of Day 2.** Files 15 and 16 are the *cross-version* story: they explain what your same-version copy got to skip, and what the trainer's separate CentOS → Ubuntu migration has to deal with. Cover them as time permits.
 
 ## Afternoon (PM) — depth + hardening, hands-on/discussion
 
@@ -34,20 +46,18 @@
 
 ## The firewall thread — consolidation day
 
-Days 1–2 built up the rules across two machines (SSH 22 on both; web 80/443 on `ubuntu-app`; MySQL 3306-from-app-IP on `ubuntu-db`). Today's **file 19** reviews the whole two-tier firewall posture in one place, confirms the principle of *least exposure*, and discusses production-grade choices (static IPs, disabling password SSH, keeping 3306 scoped to exactly the app server).
+Days 1–2 built the rules across three machines (SSH 22 everywhere; web 80/443 on `ubuntu-app`; MySQL 3306-from-app-IP on **both** `ubuntu-old-db` and `ubuntu-new-db`). Today's **file 19** reviews the whole posture in one place, confirms *least exposure*, and discusses production-grade choices (static host-only IPs, disabling password SSH, keeping 3306 scoped to exactly the app server on every database VM).
 
 ---
 
 ## Day 3 success checklist
 
-- [ ] (Demo) 5→8 differences identified and resolved (reserved words, auth plugin, engine, charset)
-- [ ] (Demo) Upgrade checker run; reported issues understood
-- [ ] (Demo) Migration validated (row counts, checksums, key objects present)
-- [ ] Deeper MySQL admin practiced on `ubuntu-db` (backup, logs, config)
-- [ ] Full two-tier hardening pass completed and firewall posture reviewed
+- [ ] Copy **validated**: schema `diff` identical, row counts match, checksums match on unchanged tables
+- [ ] Can explain the difference between a same-version **copy** and a cross-version **migration**
+- [ ] (Discussion) 5→8 differences understood; upgrade checker's role clear
+- [ ] Deeper MySQL admin practiced (backup, logs, config)
+- [ ] Full hardening pass across all three servers; firewall posture reviewed
 - [ ] Troubleshooting workshop scenarios worked through
-- [ ] Final snapshot `day3-complete` taken on both `ubuntu-app` and `ubuntu-db`
+- [ ] Final snapshot `day3-complete` taken on all three VMs
 
-> **Pending decision (flagged in file 17):** whether to keep the optional "app still works" validation check in the demo. It's included but clearly marked optional — the trainer decides on the day based on time.
-
-At the end of Day 3 the trainees can: install and secure Ubuntu, stand up a **two-tier** LAMP stack (app and DB on separate servers, linked over a scoped network path), administer and harden it — and they understand how a MySQL 5.x → 8 migration is planned, executed, and validated (having watched a real CentOS → Ubuntu one).
+At the end of Day 3 you can: install and secure Ubuntu; stand up an **Nginx + PHP-FPM + MySQL 8** stack split across separate app and database servers, linked over a scoped network path; **copy a database between servers and prove the copy correct**; administer and harden the whole thing; and you understand how a cross-version MySQL 5.x → 8 migration differs from the same-version copy you performed.

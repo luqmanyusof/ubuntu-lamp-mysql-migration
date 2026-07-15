@@ -1,11 +1,11 @@
 # 15 — MySQL 5 vs MySQL 8 Differences
 
-**Mode:** Instructor demo
-**Goal:** Understand the real, migration-relevant differences between MySQL 5.x and 8, and how to fix each one when it appears.
+**Mode:** Discussion / reference (cover if time permits)
+**Goal:** Understand the real differences between MySQL 5.x and 8, and how each one is fixed — so you can plan a cross-**version** upgrade, not just a same-version copy.
 
 **Time:** ~45 minutes
 
-> These are the issues that turn a "20-minute" migration into an afternoon. Knowing them turns surprises into checklist items.
+> **How this relates to what you did.** Your Day 2 copy went between **two MySQL 8 servers**, so you hit *none* of the problems below — a same-version copy has nothing to translate. This file is about the harder case: moving a database *across major versions* (MySQL 5.x → 8), which is exactly the CentOS → Ubuntu migration the trainer runs separately. Treat it as the map you'd need for a real upgrade project. Every fix here is a concrete thing that turns a "20-minute" migration into an afternoon.
 
 ---
 
@@ -131,17 +131,15 @@ MySQL 8 enables strict modes by default (`ONLY_FULL_GROUP_BY`, `STRICT_TRANS_TAB
 
 ---
 
-## 7. Working through the actual import errors (demo)
+## 7. Why your copy didn't hit any of these
 
-Take the errors seen during file 14's import and fix them one by one, live:
+Worth making explicit, because it's the whole reason your Day 2 lab was smooth: **a same-version copy has no version gap to cross.** Same auth-plugin default on both servers, same reserved-word list, same `utf8mb4_0900_ai_ci` collation, same InnoDB, same `sql_mode`. The dump you took on `old-db` and replayed on `new-db` needed **zero** translation — which is exactly why your `SHOW CREATE TABLE` diff in file 17 came back identical.
 
-1. Read the error → identify which category above it belongs to.
-2. Apply the matching fix (rename reserved word, convert engine, adjust auth, etc.).
-3. Re-run just the affected part, or re-import a corrected dump.
+Change *one* server to MySQL 5.7 and every section above becomes a live problem. That's the difference between a **copy** (same version, expect identical) and a **migration** (across versions, expect — and account for — deliberate change).
 
-📌 **Checkpoint:** Every error from the file 14 import is categorized and resolved (or consciously deferred with a reason).
+📌 **Checkpoint (discussion):** For each difference above, say whether it could affect your `old-db → new-db` copy. (Answer: none — both are MySQL 8. Each one *would* matter for a 5.7 → 8 move.)
 
-> The **upgrade checker** (file 16) finds most of these *before* you import — we run it next to show how to catch them proactively.
+> The **upgrade checker** (file 16) finds most of these *automatically, before* you import — the next file shows how.
 
 ---
 

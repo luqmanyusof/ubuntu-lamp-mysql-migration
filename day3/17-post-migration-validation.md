@@ -1,150 +1,147 @@
-# 17 — Post-Migration Validation
+# 17 — Validate the Copy
 
-**Mode:** Instructor demo → into hands-on
-**Goal:** Prove the migration is **complete and correct** — not just "it imported without red text." Validation is what lets you sign off a migration.
+**Mode:** Hands-on
+**Goal:** Prove the copy you made on Day 2 is **complete and correct** — not just "it imported without red text." Validation is the discipline that lets you *sign off* a database move.
 
-**Time:** ~40 minutes
+**Time:** ~45 minutes
+
+> Headers: 🟦 **`ubuntu-old-db`** (the source) · 🟪 **`ubuntu-new-db`** (the copy).
+>
+> You did the copy yesterday and cut the app over. Today you go back and **prove it was correct** — the step everyone is tempted to skip, and the one that catches silent damage.
 
 ---
 
 ## 1. The validation mindset
 
-"No errors during import" is **not** proof of success. We verify on three levels:
+Yesterday's lab hammered one idea: **"no errors during import" is not proof of success.** A copy can move every row and still be wrong — a widened column, a dropped constraint, a reset counter. None of those print an error.
 
-1. **Structural** — same databases, tables, and objects exist.
-2. **Quantitative** — same number of rows in each table.
-3. **Qualitative** — the actual data content matches (checksums/spot checks).
+So you verify on three levels, comparing 🟦 source against 🟪 copy each time:
 
-Compare **source (5.x)** against **target (8)** for each.
+1. **Structural** — the same tables and objects exist.
+2. **Quantitative** — the same number of rows in each.
+3. **Qualitative** — the actual *content* and *structure* match, byte for byte.
+
+Level 3 is the one that catches what levels 1 and 2 miss.
+
+> **Both your servers are MySQL 8**, so a correct copy should match *exactly* — same types, same collations, same checksums. (In a real cross-**version** migration some differences are expected and intentional; §6 covers that case. Here, any difference is a bug.)
 
 ---
 
-## 2. Structural check — object inventory
+## 2. Structural check — the object inventory
 
-**On the source:**
+Run this on **both** servers and compare the output:
 
 ```sql
-SELECT table_name FROM information_schema.tables
-WHERE table_schema = 'sourcedb' ORDER BY table_name;
-
-SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='sourcedb';   -- table count
-SELECT routine_name, routine_type FROM information_schema.routines WHERE routine_schema='sourcedb';
-SELECT trigger_name FROM information_schema.triggers WHERE trigger_schema='sourcedb';
+mysql> SELECT table_name FROM information_schema.tables
+       WHERE table_schema = 'appdb' ORDER BY table_name;
 ```
 
-**On the target:** run the identical queries and compare the lists.
+Expect the same three on each: **departments, employees, projects**.
 
-📌 **Checkpoint:** Table list, routine list, and trigger list match between source and target.
+📌 **Checkpoint:** Both servers list the identical three tables.
 
 ---
 
 ## 3. Quantitative check — row counts
 
-Generate per-table row counts on **both** servers and diff them.
-
-Quick approach — the approximate counts from metadata (fast, good first pass):
+The numbers you wrote down in file 12. Run on **both**:
 
 ```sql
-SELECT table_name, table_rows
-FROM information_schema.tables
-WHERE table_schema = 'sourcedb'
-ORDER BY table_name;
+mysql> SELECT
+         (SELECT COUNT(*) FROM appdb.departments) AS departments,
+         (SELECT COUNT(*) FROM appdb.employees)   AS employees,
+         (SELECT COUNT(*) FROM appdb.projects)    AS projects;
 ```
 
-> `table_rows` is an **estimate** for InnoDB. For authoritative counts, run exact counts per table:
+> ⚠️ **Mind the drift.** You cut the app over to `new-db` yesterday and may have added employees through the form *since*. If so, `new-db` will legitimately have **more** employees than `old-db` — that's not a copy error, it's writes that arrived after the copy. To compare like-for-like, either count only rows that existed at copy time (`WHERE emp_id <= 6`) or just account for the ones you added.
 
-```sql
-SELECT COUNT(*) FROM sourcedb.each_table;   -- repeat per table
-```
-
-A handy way to generate the exact-count statements automatically:
-
-```sql
-SELECT CONCAT('SELECT ''', table_name, ''' AS tbl, COUNT(*) FROM `', table_name, '`;')
-FROM information_schema.tables
-WHERE table_schema = 'sourcedb';
-```
-
-Copy its output, run on both, compare.
-
-📌 **Checkpoint:** Exact row counts match table-by-table between source and target.
+📌 **Checkpoint:** Counts match (once you account for post-cutover writes).
 
 ---
 
-## 4. Qualitative check — data integrity (checksums)
+## 4. Structural check, level 3 — diff `SHOW CREATE TABLE`
 
-Row counts can match while contents differ. `CHECKSUM TABLE` gives a fingerprint of a table's data:
+**This is the check that matters**, and the one a row count can never replace. `COUNT(*)` says nothing about whether `salary` is still `DECIMAL(10,2)` or quietly became `DOUBLE`.
 
-**On both servers:**
+The clean way to compare is to dump *just the structure* from each server and diff the two files.
 
-```sql
-CHECKSUM TABLE sourcedb.customers, sourcedb.orders;
+🟦 On **`ubuntu-old-db`**:
+
+```bash
+$ mysqldump -u root -p --no-data --skip-comments appdb > /tmp/old-schema.sql
 ```
 
-Compare the numbers per table.
+🟪 On **`ubuntu-new-db`**:
 
-> ⚠️ **Caveat:** checksums can legitimately differ across 5→8 if you **intentionally changed** things during migration (charset conversion, engine change, reserved-word rename). Use checksums on tables you migrated **unchanged**. For changed tables, fall back to targeted spot checks:
-
-```sql
--- spot-check specific known rows
-SELECT * FROM sourcedb.customers WHERE id IN (1, 500, 999) ORDER BY id;
+```bash
+$ mysqldump -u root -p --no-data --skip-comments appdb > /tmp/new-schema.sql
 ```
 
-Run identical spot checks on both and eyeball the results.
+Now get both files onto one machine and compare. From `ubuntu-new-db`:
 
-📌 **Checkpoint:** Unchanged tables have matching checksums; changed tables pass spot checks.
+```bash
+$ scp student@<old-db-IP>:/tmp/old-schema.sql /tmp/
+$ diff /tmp/old-schema.sql /tmp/new-schema.sql && echo "IDENTICAL"
+```
+
+- `--no-data` dumps **structure only** — every `CREATE TABLE`, exactly as stored.
+- `--skip-comments` strips the header comments (timestamps, host names) that would otherwise show as spurious differences.
+
+📌 **Checkpoint:** `diff` prints nothing and you see **`IDENTICAL`**. The schemas — types, sizes, keys, `AUTO_INCREMENT`, charset, collation — match to the byte.
+
+> **If `diff` shows something**, read it. On two MySQL-8 servers the only *legitimate* difference is the `AUTO_INCREMENT=` counter, which moves as you insert rows. Anything else — a changed type, a missing `UNIQUE`, a dropped `FOREIGN KEY` — is a real defect in the copy, and now you've caught it instead of shipping it.
 
 ---
 
-## 5. Object-level correctness
+## 5. Qualitative check — checksums
 
-- **Foreign keys** present and valid:
-  ```sql
-  SELECT table_name, constraint_name FROM information_schema.table_constraints
-  WHERE table_schema='sourcedb' AND constraint_type='FOREIGN KEY';
-  ```
-- **Indexes** present:
-  ```sql
-  SHOW INDEX FROM sourcedb.orders;
-  ```
-- **AUTO_INCREMENT** continues from the right value (so new inserts don't collide):
-  ```sql
-  SELECT table_name, auto_increment FROM information_schema.tables
-  WHERE table_schema='sourcedb' AND auto_increment IS NOT NULL;
-  ```
+Row counts match and structures match. Last question: is the **data content** identical? `CHECKSUM TABLE` fingerprints a table's contents.
 
-📌 **Checkpoint:** Keys, indexes, and auto-increment values look correct.
+Run on **both** servers:
+
+```sql
+mysql> CHECKSUM TABLE appdb.departments, appdb.projects;
+```
+
+Compare the number per table between source and copy.
+
+> **Use checksums on tables you did *not* write to after the copy** — `departments` and `projects` are ideal. Skip `employees` if you added rows through the form post-cutover: its contents legitimately diverged, and a mismatch there is drift, not corruption. To checksum it fairly, compare only the original rows:
+> ```sql
+> mysql> SELECT MD5(GROUP_CONCAT(emp_id, name, email, salary, hired_on ORDER BY emp_id))
+>        FROM appdb.employees WHERE emp_id <= 6;
+> ```
+> Run that on both — identical hashes mean the original six rows are byte-identical.
+
+📌 **Checkpoint:** `departments` and `projects` checksums match between the two servers.
 
 ---
 
-## 6. (Optional) "App still works" check
+## 6. When differences are *expected* — the real migration
 
-> **This section is optional — the trainer keeps or drops it based on time. It is a nice, tangible finish if the schedule allows.**
+Everything above assumed same-version, so **any** difference is a bug. A real MySQL **5→8** migration is different: you *intentionally* change things on the way — convert `utf8` → `utf8mb4`, rename a reserved-word column, switch MyISAM → InnoDB (files 15–16). There, a blind `diff` and a checksum mismatch are **expected**, and validation shifts from "prove they're identical" to "prove every difference was deliberate."
 
-If a lightweight app can point at the migrated `sourcedb`, do a real end-to-end check:
+The discipline is the same three levels; only the pass criteria change:
 
-1. Configure a test app/user (created in file 14 §5) to connect to the migrated database on MySQL 8.
-2. Load a page that reads data → confirm expected records appear.
-3. Perform one write → confirm it persists and reads back.
+| | Same-version copy (yours) | Cross-version migration (the trainer's) |
+|---|---|---|
+| Schema `diff` | Must be identical (bar `AUTO_INCREMENT`) | Differences allowed **if** each was an intended fix |
+| Checksums | Must match | Differ on any table you converted; spot-check instead |
+| Row counts | Must match | Must **still** match — counts never change on a clean migration |
 
-This demonstrates that not only the data, but **connectivity and the auth-plugin choice**, are correct in practice.
-
-> Remember: full application migration is **out of scope**. This is only a confidence check that the migrated database serves a client correctly — not a migration of the app itself.
-
-📌 **Checkpoint (if run):** A client reads and writes the migrated data on MySQL 8 successfully.
+> **The takeaway:** row counts are the invariant that holds in *both* worlds. Structure and checksums are where "identical copy" and "correct migration" part ways.
 
 ---
 
 ## 7. Sign-off
 
-Migration is validated when:
+Your copy is validated when:
 
-- [ ] Object inventory matches (tables, routines, triggers)
-- [ ] Exact row counts match table-by-table
-- [ ] Unchanged tables checksum-match; changed tables pass spot checks
-- [ ] Foreign keys, indexes, auto-increment correct
-- [ ] (Optional) A client reads/writes the migrated DB successfully
+- [ ] Object inventory matches — same three tables on both servers
+- [ ] Row counts match (accounting for any post-cutover writes)
+- [ ] `SHOW CREATE TABLE` / schema `diff` is **identical** bar the `AUTO_INCREMENT` counter
+- [ ] Checksums match on tables you didn't write to after cutover
+- [ ] You can explain *why* any difference that remains is legitimate
 
-Record the results. This checklist is the migration's acceptance evidence.
+Record the results — this checklist is your acceptance evidence. "I diffed the schemas and they were identical" is a sentence you can put your name to; "it imported fine" is not.
 
-Next: **`18-mysql-admin-deeper.md`** — day-to-day administration of your new MySQL 8 server.
+Next: **`18-mysql-admin-deeper.md`** — day-to-day administration of your MySQL 8 servers.
